@@ -24,4 +24,6 @@
 
 ## Deployment
 
-Not deployed. An older Site identity was not found in the accessible workspace.
+The existing owner-only Site `DataPilot Clinical Review` was recovered and is being reused.
+GitHub synchronization is blocked because the currently authenticated GitHub account has read-only
+access to `LunaISaFISH/DataPilot`; the local commit remains complete and deployable.
