@@ -27,11 +27,11 @@
 
 ## Deployment
 
-The existing owner-only Site `DataPilot Clinical Review` was recovered and deployed at
+The existing public Site `DataPilot Clinical Review` was recovered and deployed at
 `https://datapilot-clinical-review.franzxu28.chatgpt.site`. Production smoke checks pass for the
-dashboard, replay, reports, cleaned CSV, and release manifest. The hosted preview is deliberately
-replay-only until a protected FastAPI runtime is attached; the complete live product runs locally
-through Docker Compose.
+dashboard, replay, reports, cleaned CSV, and release manifest. It can be opened without a GPT login
+for recruitment-event scanning. The hosted preview is deliberately replay-only until a protected
+FastAPI runtime is attached; the complete live product runs locally through Docker Compose.
 
 The source repository is available at `https://github.com/LunaISaFISH/DataPilot`. The only remaining
 deployment limitation is the absence of a protected public FastAPI runtime URL; no alternate backend
