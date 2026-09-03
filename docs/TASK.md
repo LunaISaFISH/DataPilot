@@ -12,18 +12,24 @@
   are generated from engine output.
 - Local verification: 24 pytest tests, Ruff, strict mypy, frontend lint, production build, full
   390x844 Chinese flow, and real 5,200-row browser upload all pass.
+- Docker Compose builds both services and starts a healthy API plus a working Web container.
 
 ## Next
 
-1. Commit and push the integrated P0 slice.
-2. Run the opt-in Anthropic Haiku smoke and one explicit Sonnet quality sample.
-3. Deploy the Sites frontend and run production smoke tests.
-4. Deploy the live FastAPI container if a compatible authenticated runtime is available;
-   otherwise keep the public deployment truthfully limited to verified replay and document the
-   single runtime credential blocker.
+1. Grant the current GitHub account write access (or authenticate the repository owner), then push
+   the existing local commits.
+2. Run the opt-in Anthropic Haiku smoke and one explicit Sonnet quality sample from repository
+   secrets.
+3. Attach a protected FastAPI runtime URL when deployment credentials are available.
 
 ## Deployment
 
-The existing owner-only Site `DataPilot Clinical Review` was recovered and is being reused.
-GitHub synchronization is blocked because the currently authenticated GitHub account has read-only
-access to `LunaISaFISH/DataPilot`; the local commit remains complete and deployable.
+The existing owner-only Site `DataPilot Clinical Review` was recovered and deployed at
+`https://datapilot-clinical-review.franzxu28.chatgpt.site`. Production smoke checks pass for the
+dashboard, replay, reports, cleaned CSV, and release manifest. The hosted preview is deliberately
+replay-only until a protected FastAPI runtime is attached; the complete live product runs locally
+through Docker Compose.
+
+GitHub synchronization and the repository-secret LLM smoke are blocked because the currently
+authenticated GitHub account has read-only access to `LunaISaFISH/DataPilot`. No alternative remote
+or unapproved model spending was used.

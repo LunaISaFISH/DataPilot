@@ -38,6 +38,15 @@ the quality input only when one Sonnet comparison is needed.
 The public demonstration uses synthetic data only. The live CSV endpoint is observational
 unless a valid Data Contract/Policy Pack is supplied.
 
+Run the complete local product with containers:
+
+```bash
+docker compose up --build
+```
+
+The published Sites preview intentionally switches to verified replay when no protected API URL
+is configured. It never directs a public visitor to `localhost` or describes replay as live work.
+
 ## Truth boundaries
 
 - The model never receives dataframe write access and never produces executable code.

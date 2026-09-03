@@ -23,6 +23,8 @@ Current generated release facts:
 Both English and native Chinese UI modes use the same report and action ledger. The language
 choice is presentation-only and never changes engine output.
 
+Owner-only deployment: `https://datapilot-clinical-review.franzxu28.chatgpt.site/demo/clinical-nlp`.
+
 Regenerate after an intentional fixture or engine change:
 
 ```bash

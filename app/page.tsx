@@ -20,9 +20,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useLanguage } from '@/lib/language';
+import { useLiveApiAvailable } from '@/lib/live-api';
 
 export default function Home() {
   const { t } = useLanguage();
+  const liveApiAvailable = useLiveApiAvailable();
   const checks = [
     [t('Profile structure', '分析数据结构'), t('18 fields', '18 个字段')],
     [t('Evaluate release policy', '执行发布策略'), t('7 checks', '7 项检查')],
@@ -85,13 +87,19 @@ export default function Home() {
             </CardHeader>
             <CardContent className="space-y-4 pt-1">
               <Link
-                href="/runs/new"
+                href={liveApiAvailable ? '/runs/new' : '/demo/clinical-nlp'}
                 className="flex min-h-28 w-full items-center justify-between gap-4 rounded-[16px] border border-dashed border-border bg-muted/45 px-4 text-left transition-colors hover:border-primary/45 hover:bg-policy-tint/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
               >
                 <span>
-                  <span className="block text-base font-semibold">{t('Choose a CSV file', '选择 CSV 文件')}</span>
+                  <span className="block text-base font-semibold">
+                    {liveApiAvailable
+                      ? t('Choose a CSV file', '选择 CSV 文件')
+                      : t('Open verified replay', '打开已验证演示回放')}
+                  </span>
                   <span className="mt-1 block text-sm text-muted-foreground">
-                    {t('Nothing is changed without a reviewable action.', '未经可审查的动作授权，不会修改任何数据。')}
+                    {liveApiAvailable
+                      ? t('Nothing is changed without a reviewable action.', '未经可审查的动作授权，不会修改任何数据。')
+                      : t('The published preview does not claim a live engine connection.', '当前发布预览未连接实时引擎，不会伪装为在线分析。')}
                   </span>
                 </span>
                 <ArrowRight aria-hidden="true" className="size-5 shrink-0 text-primary" />

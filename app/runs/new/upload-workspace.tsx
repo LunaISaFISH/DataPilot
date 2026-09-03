@@ -18,11 +18,11 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatLabel, type RunReport } from '@/lib/datapilot';
 import { useLanguage } from '@/lib/language';
+import { resolveApiBase, useLiveApiAvailable } from '@/lib/live-api';
 
 type CreatedRun = { run_id: string; report: RunReport };
 type UploadState = 'idle' | 'loading' | 'success' | 'error';
 
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 const zhFindingTitles: Record<string, string> = {
   'DUP-001': '可从发布版本排除完全重复的导入记录',
   'CAT-002': '地区别名可规范化',
@@ -36,6 +36,7 @@ const zhFindingTitles: Record<string, string> = {
 
 export function UploadWorkspace() {
   const { language, t } = useLanguage();
+  const liveApiAvailable = useLiveApiAvailable();
   const [csv, setCsv] = useState<File | null>(null);
   const [policy, setPolicy] = useState<File | null>(null);
   const [state, setState] = useState<UploadState>('idle');
@@ -44,6 +45,12 @@ export function UploadWorkspace() {
 
   async function analyze() {
     if (!csv) return;
+    const apiBase = resolveApiBase();
+    if (!apiBase) {
+      setError(t('No protected live API is connected to this deployment.', '当前部署未连接受保护的实时 API。'));
+      setState('error');
+      return;
+    }
     setState('loading');
     setError('');
     const form = new FormData();
@@ -94,7 +101,9 @@ export function UploadWorkspace() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className="hidden bg-policy-tint text-policy ring-1 ring-policy/15 sm:inline-flex">Polars {t('engine', '引擎')}</Badge>
+            <Badge className="hidden bg-policy-tint text-policy ring-1 ring-policy/15 sm:inline-flex">
+              {liveApiAvailable ? `Polars ${t('engine', '引擎')}` : t('Replay only', '仅演示回放')}
+            </Badge>
             <LanguageToggle />
           </div>
         </div>
@@ -164,7 +173,7 @@ export function UploadWorkspace() {
                 ) : null}
                 <Button
                   size="lg"
-                  disabled={!csv || state === 'loading'}
+                  disabled={!liveApiAvailable || !csv || state === 'loading'}
                   className="min-h-12 w-full rounded-[14px]"
                   onClick={analyze}
                 >
@@ -187,6 +196,14 @@ export function UploadWorkspace() {
               <ShieldCheck aria-hidden="true" className="size-4 text-policy" />
               {t('Raw sensitive values are withheld from logs and semantic analysis.', '原始敏感值不会进入日志或语义分析。')}
             </div>
+            {!liveApiAvailable ? (
+              <Link
+                href="/demo/clinical-nlp"
+                className="mt-4 flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-primary"
+              >
+                {t('Open verified replay instead', '改为打开已验证演示回放')}
+              </Link>
+            ) : null}
           </section>
         ) : (
           <section>
