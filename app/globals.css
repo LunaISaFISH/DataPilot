@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--policy-tint);
+  --color-accent-foreground: var(--policy);
+  --color-destructive: var(--blocker);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--policy);
+  --color-ink: var(--ink);
+  --color-policy: var(--policy);
+  --color-policy-tint: var(--policy-tint);
+  --color-ai: var(--ai);
+  --color-review: var(--review);
+  --color-blocker: var(--blocker);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+}
+
+:root {
+  --background: #eef3f1;
+  --foreground: #10231e;
+  --ink: #10231e;
+  --card: #ffffff;
+  --primary: #0b6b5b;
+  --primary-foreground: #ffffff;
+  --secondary: #ddeae6;
+  --muted: #e5eeeb;
+  --muted-foreground: #40534d;
+  --border: #cfdad6;
+  --policy: #0b6b5b;
+  --policy-tint: #ddf1eb;
+  --ai: #4e5bd5;
+  --review: #7a4a06;
+  --blocker: #8e2f2c;
+  --radius: 14px;
+  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply bg-background font-sans;
+  }
+
+  body {
+    @apply min-h-dvh bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: var(--policy-tint);
+    color: var(--ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

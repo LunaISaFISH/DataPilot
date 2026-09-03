@@ -1,0 +1,17 @@
+{
+  "fixture_version": "clinical-nlp-1.0.0",
+  "seed": 20260904,
+  "record_count": 5200,
+  "column_count": 18,
+  "synthetic": true,
+  "findings": {
+    "DUP-001": {"surplus_records": 43},
+    "CAT-002": {"affected_records": 61, "affected_cells": 61},
+    "FMT-003": {"affected_records": 72, "affected_cells": 72},
+    "SEM-004": {"candidate_records": 184, "supported_records": 183, "conflict_records": 1},
+    "AMB-005": {"affected_records": 8, "affected_cells": 8},
+    "MISS-006": {"affected_records": 27, "affected_cells": 27},
+    "PHI-007": {"affected_records": 3}
+  }
+}
+

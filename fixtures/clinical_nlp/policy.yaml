@@ -1,0 +1,50 @@
+id: clinical-nlp
+version: 1.0.0
+
+score:
+  version: dq-1.0
+  weights:
+    completeness: 0.30
+    validity: 0.25
+    consistency: 0.25
+    uniqueness: 0.20
+
+required_fields:
+  - diagnosis_code
+
+business_key:
+  - record_id
+
+canonical:
+  diagnosis_label:
+    Hypertension:
+      - HTN
+      - hypertension
+      - HYPERTENSION
+      - "Hypertension "
+  region:
+    North:
+      - north
+      - NORTH
+      - Northern
+
+allowed_regions:
+  - North
+  - South
+  - East
+  - West
+
+ambiguity_registry:
+  - MS
+  - RA
+  - CVA
+  - PCP
+
+sensitive_fields:
+  - free_text_note
+
+auto_authorization:
+  exact_duplicate_exclusion: true
+  region_normalization: true
+  unambiguous_date_standardization: true
+
