@@ -1,0 +1,33 @@
+name: Anthropic semantic smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      quality_check:
+        description: Also run one Sonnet quality sample
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  semantic-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install DataPilot core
+        run: pip install .
+      - name: Run bounded semantic samples
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: claude-haiku-4-5-20251001
+          ANTHROPIC_QUALITY_MODEL: claude-sonnet-4-6
+          RUN_QUALITY: ${{ inputs.quality_check && '1' || '0' }}
+        run: python scripts/llm_smoke.py

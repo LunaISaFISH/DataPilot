@@ -10,9 +10,21 @@ The demonstration moves from blocked release brief through semantic review, expl
 high-risk dispositions, dry run, deterministic apply, validation, and conditional release.
 Exact visible scores and counts come from the report; prose must not duplicate them.
 
+Current generated release facts:
+
+- Baseline source quality: 98.73; verified candidate quality: 99.66.
+- 8 atomic findings are dispositioned exactly once.
+- 316 cells are transformed, 36 records are quarantined, and 43 exact duplicate records are
+  excluded from the release package without deleting them from the source.
+- 5,121 records are eligible, the optional sensitive free-text column is excluded, and 10/10
+  required validations pass.
+- Final status is `CONDITIONAL_PASS`; score scope is unchanged across the run.
+
+Both English and native Chinese UI modes use the same report and action ledger. The language
+choice is presentation-only and never changes engine output.
+
 Regenerate after an intentional fixture or engine change:
 
 ```bash
 .venv/bin/python scripts/generate_golden.py
 ```
-

@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 from datapilot.contracts.models import AIProposal, SemanticRequest
-from datapilot.semantic import VerifiedReplayProvider, validate_proposal
+from datapilot.semantic import AnthropicProvider, VerifiedReplayProvider, validate_proposal
 
 REQUEST = SemanticRequest(
     finding_id="SEM-004",
@@ -58,4 +58,36 @@ def test_ambiguity_forces_abstention() -> None:
 
     assert proposal.abstained is True
     assert proposal.mapping is None
+    assert result.valid is True
+
+
+def test_anthropic_provider_uses_minimized_structured_payload() -> None:
+    captured: dict[str, object] = {}
+
+    def transport(payload: dict[str, object]) -> dict[str, object]:
+        captured.update(payload)
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        '{"finding_id":"SEM-004","proposed_action":"NORMALIZE_CATEGORY",'
+                        '"column":"diagnosis_label","mapping":{"HTN":"Hypertension",'
+                        '"hypertension":"Hypertension"},"evidence_refs":['
+                        '"EVID-GLOSSARY-01","EVID-CODE-02"],"semantic_explanation":'
+                        '"Supported by configured evidence.","ambiguity_flags":[],'
+                        '"abstained":false,"abstain_reason":null}'
+                    ),
+                }
+            ]
+        }
+
+    proposal = AnthropicProvider("test-key", transport=transport).assess(REQUEST)
+    result = validate_proposal(REQUEST, proposal)
+
+    assert captured["model"] == "claude-haiku-4-5-20251001"
+    assert captured["temperature"] == 0
+    assert "output_config" in captured
+    assert "patient" not in str(captured).lower()
+    assert proposal.provider == "anthropic"
     assert result.valid is True

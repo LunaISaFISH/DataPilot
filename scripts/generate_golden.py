@@ -42,6 +42,11 @@ def main() -> None:
         ROOT / "public" / "demo" / "release-report.json",
         bundle.result.model_dump(mode="json"),
     )
+    atomic_write_bytes(ROOT / "public" / "demo" / "cleaned.csv", bundle.release_csv)
+    atomic_write_json(
+        ROOT / "public" / "demo" / "release-manifest.json",
+        bundle.result.release_manifest.model_dump(mode="json"),
+    )
     atomic_write_json(ROOT / "public" / "demo" / "events.json", events)
 
 

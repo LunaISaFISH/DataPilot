@@ -1,0 +1,17 @@
+{
+  "name": "DataPilot",
+  "short_name": "DataPilot",
+  "description": "Explainable dataset release decisions.",
+  "start_url": "/demo/clinical-nlp",
+  "display": "standalone",
+  "background_color": "#EEF3F1",
+  "theme_color": "#0B6B5B",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

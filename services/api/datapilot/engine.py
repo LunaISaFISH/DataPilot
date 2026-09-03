@@ -408,6 +408,10 @@ def analyze_csv(
             index for index in semantic_indexes if rows[index].get("diagnosis_code") == "I10"
         ]
         conflicts = sorted(set(semantic_indexes) - set(supported))
+        observed_counts: dict[str, int] = {}
+        for index in semantic_indexes:
+            value = str(rows[index]["diagnosis_label"])
+            observed_counts[value] = observed_counts.get(value, 0) + 1
         findings.append(
             _finding(
                 finding_id="SEM-004",
@@ -450,6 +454,7 @@ def analyze_csv(
                 ],
                 details={
                     "mapping": diagnosis_mapping,
+                    "observed_counts": observed_counts,
                     "candidate_record_count": len(semantic_indexes),
                     "supported_record_count": len(supported),
                     "conflict_record_uids": [record_uids[index] for index in conflicts],
