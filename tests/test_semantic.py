@@ -72,8 +72,10 @@ def test_anthropic_provider_uses_minimized_structured_payload() -> None:
                     "type": "text",
                     "text": (
                         '{"finding_id":"SEM-004","proposed_action":"NORMALIZE_CATEGORY",'
-                        '"column":"diagnosis_label","mapping":{"HTN":"Hypertension",'
-                        '"hypertension":"Hypertension"},"evidence_refs":['
+                        '"column":"diagnosis_label","mapping":['
+                        '{"source":"HTN","target":"Hypertension"},'
+                        '{"source":"hypertension","target":"Hypertension"}],'
+                        '"evidence_refs":['
                         '"EVID-GLOSSARY-01","EVID-CODE-02"],"semantic_explanation":'
                         '"Supported by configured evidence.","ambiguity_flags":[],'
                         '"abstained":false,"abstain_reason":null}'
@@ -88,6 +90,12 @@ def test_anthropic_provider_uses_minimized_structured_payload() -> None:
     assert captured["model"] == "claude-haiku-4-5-20251001"
     assert captured["temperature"] == 0
     assert "output_config" in captured
+    output_config = captured["output_config"]
+    assert isinstance(output_config, dict)
+    output_format = output_config["format"]
+    assert isinstance(output_format, dict)
+    assert "name" not in output_format
     assert "patient" not in str(captured).lower()
+    assert proposal.mapping == {"HTN": "Hypertension", "hypertension": "Hypertension"}
     assert proposal.provider == "anthropic"
     assert result.valid is True
