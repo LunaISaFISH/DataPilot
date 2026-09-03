@@ -13,14 +13,17 @@
 - Local verification: 24 pytest tests, Ruff, strict mypy, frontend lint, production build, full
   390x844 Chinese flow, and real 5,200-row browser upload all pass.
 - Docker Compose builds both services and starts a healthy API plus a working Web container.
+- GitHub `main` is synchronized at `83e5875`; all commits are authored and committed as
+  `LunaISaFISH <65061532+LunaISaFISH@users.noreply.github.com>`.
+- The opt-in Anthropic smoke on 2026-09-04 verified a grounded Haiku 4.5 proposal with five
+  affected records. The single Sonnet 4.6 quality attempt timed out and failed closed; it did not
+  create an action. No further paid retry was made.
 
 ## Next
 
-1. Grant the current GitHub account write access (or authenticate the repository owner), then push
-   the existing local commits.
-2. Run the opt-in Anthropic Haiku smoke and one explicit Sonnet quality sample from repository
-   secrets.
-3. Attach a protected FastAPI runtime URL when deployment credentials are available.
+1. Attach a protected FastAPI runtime URL when deployment credentials are available.
+2. If a longer semantic timeout is intentionally approved later, rerun only the Sonnet quality
+   sample; the low-cost model and full deterministic fallback are already verified.
 
 ## Deployment
 
@@ -30,6 +33,6 @@ dashboard, replay, reports, cleaned CSV, and release manifest. The hosted previe
 replay-only until a protected FastAPI runtime is attached; the complete live product runs locally
 through Docker Compose.
 
-GitHub synchronization and the repository-secret LLM smoke are blocked because the currently
-authenticated GitHub account has read-only access to `LunaISaFISH/DataPilot`. No alternative remote
-or unapproved model spending was used.
+The source repository is available at `https://github.com/LunaISaFISH/DataPilot`. The only remaining
+deployment limitation is the absence of a protected public FastAPI runtime URL; no alternate backend
+or misleading live-mode claim was introduced.
