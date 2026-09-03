@@ -32,6 +32,8 @@ SENSITIVE_PATTERNS = (
     re.compile(r"\+?\d[\d\s().-]{7,}\d"),
     re.compile(r"\b(?:name|patient)\s*:\s*[^,;]{3,}", re.IGNORECASE),
 )
+ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+ALTERNATE_DATE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
 
 
 class AnalysisError(ValueError):
@@ -187,6 +189,88 @@ def _score(
     return MetricScore(name=name, numerator=numerator, denominator=denominator, score=score)
 
 
+def build_profile(
+    frame: pl.DataFrame,
+    rows: list[dict[str, Any]],
+    record_uids: list[str],
+    policy: dict[str, Any],
+    dataset_hash: str,
+    duplicate_count: int,
+) -> ProfileSummary:
+    columns = frame.columns
+    canonical = policy.get("canonical", {})
+    required_fields = [field for field in policy.get("required_fields", []) if field in columns]
+    completeness_denominator = frame.height * len(required_fields)
+    completeness_numerator = sum(
+        1
+        for row in rows
+        for field in required_fields
+        if row.get(field) is not None and str(row.get(field)).strip() != ""
+    )
+    date_values = [row.get("encounter_date") for row in rows if "encounter_date" in row]
+    validity_denominator = len(date_values)
+    validity_numerator = sum(
+        1 for value in date_values if isinstance(value, str) and ISO_DATE.fullmatch(value)
+    )
+    consistency_columns = [
+        column for column in ("region", "diagnosis_label") if column in columns
+    ]
+    consistency_denominator = frame.height * len(consistency_columns)
+    allowed_regions = set(policy.get("allowed_regions", []))
+    accepted_diagnoses = {"Type 2 diabetes", *canonical.get("diagnosis_label", {}).keys()}
+    consistency_numerator = 0
+    for row in rows:
+        if "region" in consistency_columns and row.get("region") in allowed_regions:
+            consistency_numerator += 1
+        if (
+            "diagnosis_label" in consistency_columns
+            and row.get("diagnosis_label") in accepted_diagnoses
+        ):
+            consistency_numerator += 1
+    metrics = [
+        _score("completeness", completeness_numerator, completeness_denominator),
+        _score("validity", validity_numerator, validity_denominator),
+        _score("consistency", consistency_numerator, consistency_denominator),
+        _score("uniqueness", frame.height - duplicate_count, frame.height),
+    ]
+    weights = policy.get("score", {}).get("weights", {})
+    applicable = [metric for metric in metrics if metric.score is not None]
+    effective_weight = sum(float(weights.get(metric.name, 0)) for metric in applicable)
+    overall = (
+        None
+        if effective_weight == 0
+        else round(
+            sum(
+                float(metric.score) * float(weights.get(metric.name, 0))
+                for metric in applicable
+                if metric.score is not None
+            )
+            / effective_weight,
+            2,
+        )
+    )
+    scope_hash = hashlib.sha256("\n".join(record_uids).encode()).hexdigest()
+    evaluation_material = {
+        "record_uids": record_uids,
+        "fields": sorted(required_fields + consistency_columns + ["encounter_date"]),
+        "policy": policy,
+        "score_version": policy.get("score", {}).get("version", "dq-1.0"),
+    }
+    evaluation_scope_hash = hashlib.sha256(
+        canonical_json(evaluation_material).encode()
+    ).hexdigest()
+    return ProfileSummary(
+        dataset_hash=dataset_hash,
+        record_count=frame.height,
+        column_count=frame.width,
+        scope_hash=scope_hash,
+        evaluation_scope_hash=evaluation_scope_hash,
+        score_version=policy.get("score", {}).get("version", "dq-1.0"),
+        metrics=metrics,
+        overall_score=overall,
+    )
+
+
 def analyze_csv(
     content: bytes,
     policy: dict[str, Any] | None = None,
@@ -212,6 +296,7 @@ def analyze_csv(
             seen[key] = index
     if duplicate_indexes:
         duplicate_uids = [record_uids[index] for index in duplicate_indexes]
+        observational_only = active_policy.get("id") == "baseline-observational"
         findings.append(
             _finding(
                 finding_id="DUP-001",
@@ -221,8 +306,16 @@ def analyze_csv(
                 record_uids=duplicate_uids,
                 risk=RiskLevel.LOW,
                 blocking=False,
-                authorization=AuthorizationMode.POLICY_AUTHORIZED,
-                action=AllowedAction.EXCLUDE_EXACT_DUPLICATE_FROM_RELEASE,
+                authorization=(
+                    AuthorizationMode.FORBIDDEN
+                    if observational_only
+                    else AuthorizationMode.POLICY_AUTHORIZED
+                ),
+                action=(
+                    None
+                    if observational_only
+                    else AllowedAction.EXCLUDE_EXACT_DUPLICATE_FROM_RELEASE
+                ),
                 signals=[
                     _signal(
                         "identical_payload",
@@ -269,14 +362,12 @@ def analyze_csv(
             )
         )
 
-    iso_date = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-    alternate_date = re.compile(r"^\d{2}/\d{2}/\d{4}$")
     date_indexes = [
         index
         for index, row in enumerate(rows)
         if isinstance(row.get("encounter_date"), str)
-        and not iso_date.fullmatch(row["encounter_date"])
-        and alternate_date.fullmatch(row["encounter_date"])
+        and not ISO_DATE.fullmatch(row["encounter_date"])
+        and ALTERNATE_DATE.fullmatch(row["encounter_date"])
     ]
     if date_indexes:
         findings.append(
@@ -492,79 +583,13 @@ def analyze_csv(
             )
         )
 
-    required_fields = [
-        field for field in active_policy.get("required_fields", []) if field in columns
-    ]
-    completeness_denominator = frame.height * len(required_fields)
-    completeness_numerator = sum(
-        1
-        for row in rows
-        for field in required_fields
-        if row.get(field) is not None and str(row.get(field)).strip() != ""
-    )
-    date_values = [row.get("encounter_date") for row in rows if "encounter_date" in row]
-    validity_denominator = len(date_values)
-    validity_numerator = sum(
-        1 for value in date_values if isinstance(value, str) and iso_date.fullmatch(value)
-    )
-    consistency_columns = [
-        column for column in ("region", "diagnosis_label") if column in columns
-    ]
-    consistency_denominator = frame.height * len(consistency_columns)
-    allowed_regions = set(active_policy.get("allowed_regions", []))
-    accepted_diagnoses = {"Type 2 diabetes", *canonical.get("diagnosis_label", {}).keys()}
-    consistency_numerator = 0
-    for row in rows:
-        if "region" in consistency_columns and row.get("region") in allowed_regions:
-            consistency_numerator += 1
-        if (
-            "diagnosis_label" in consistency_columns
-            and row.get("diagnosis_label") in accepted_diagnoses
-        ):
-            consistency_numerator += 1
-    uniqueness_denominator = frame.height
-    uniqueness_numerator = frame.height - len(duplicate_indexes)
-    metrics = [
-        _score("completeness", completeness_numerator, completeness_denominator),
-        _score("validity", validity_numerator, validity_denominator),
-        _score("consistency", consistency_numerator, consistency_denominator),
-        _score("uniqueness", uniqueness_numerator, uniqueness_denominator),
-    ]
-    weights = active_policy.get("score", {}).get("weights", {})
-    applicable = [metric for metric in metrics if metric.score is not None]
-    effective_weight = sum(float(weights.get(metric.name, 0)) for metric in applicable)
-    overall = (
-        None
-        if effective_weight == 0
-        else round(
-            sum(
-                float(metric.score) * float(weights.get(metric.name, 0))
-                for metric in applicable
-                if metric.score is not None
-            )
-            / effective_weight,
-            2,
-        )
-    )
-    scope_hash = hashlib.sha256("\n".join(record_uids).encode()).hexdigest()
-    evaluation_material = {
-        "record_uids": record_uids,
-        "fields": sorted(required_fields + consistency_columns + ["encounter_date"]),
-        "policy": active_policy,
-        "score_version": active_policy.get("score", {}).get("version", "dq-1.0"),
-    }
-    evaluation_scope_hash = hashlib.sha256(
-        canonical_json(evaluation_material).encode()
-    ).hexdigest()
-    profile = ProfileSummary(
-        dataset_hash=dataset_hash,
-        record_count=frame.height,
-        column_count=frame.width,
-        scope_hash=scope_hash,
-        evaluation_scope_hash=evaluation_scope_hash,
-        score_version=active_policy.get("score", {}).get("version", "dq-1.0"),
-        metrics=metrics,
-        overall_score=overall,
+    profile = build_profile(
+        frame,
+        rows,
+        record_uids,
+        active_policy,
+        dataset_hash,
+        len(duplicate_indexes),
     )
     release_status = (
         ReleaseStatus.NOT_EVALUATED

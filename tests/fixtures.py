@@ -14,3 +14,7 @@ def clinical_csv() -> bytes:
 def clinical_policy() -> dict[str, object]:
     return load_policy(Path("fixtures/clinical_nlp/policy.yaml"))
 
+
+@pytest.fixture(scope="session")
+def clinical_policy_bytes() -> bytes:
+    return Path("fixtures/clinical_nlp/policy.yaml").read_bytes()
