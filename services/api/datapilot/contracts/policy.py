@@ -483,10 +483,19 @@ def parse_contract(text: str) -> DataContract:
     try:
         loaded = yaml.safe_load(text)
     except yaml.YAMLError as error:
+        mark = getattr(error, "problem_mark", None)
+        if mark is None:
+            location_zh = ""
+            location_en = ""
+        else:
+            line = int(mark.line) + 1
+            column = int(mark.column) + 1
+            location_zh = f"（第 {line} 行，第 {column} 列）"
+            location_en = f" (line {line}, column {column})"
         raise _fail(
             "CONTRACT_YAML_INVALID",
-            f"契约不是合法的 YAML：{error}",
-            f"Contract is not valid YAML: {error}",
+            f"契约不是合法的 YAML{location_zh}。",
+            f"Contract is not valid YAML{location_en}.",
         ) from error
     if not isinstance(loaded, dict):
         raise _fail(

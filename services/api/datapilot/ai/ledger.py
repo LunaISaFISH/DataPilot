@@ -89,6 +89,8 @@ class Ledger:
         self.store = store
         self._memory: dict[str, list[AICallRecord]] = {}
         self._lock = threading.RLock()
+        self._live_call_reservations: dict[str, int] = {}
+        self._completed_live_calls: dict[str, int] = {}
 
     def _persisted(self, run_id: str) -> bool:
         if self.store is None:
@@ -110,12 +112,61 @@ class Ledger:
         with self._lock:
             return len(self._memory.get(run_id, []))
 
+    @staticmethod
+    def _records_live_attempt(record: AICallRecord) -> bool:
+        """Whether a record represents an attempted live-provider dispatch.
+
+        A failed live attempt is ultimately delivered by the deterministic fallback, so its
+        final ``provider`` is deterministic. The stable marker in ``error`` preserves the
+        attempted provider without making the delivered result look like Anthropic output.
+        """
+        return record.provider is ProviderName.ANTHROPIC or (
+            record.error is not None and "attempted_provider=anthropic" in record.error
+        )
+
+    def _recorded_live_calls(self, run_id: str) -> int:
+        return sum(1 for record in self.read(run_id) if self._records_live_attempt(record))
+
     def live_calls(self, run_id: str) -> int:
-        """Records that reached (or attempted) a live provider — what the budget bounds."""
-        return sum(1 for record in self.read(run_id) if record.provider is ProviderName.ANTHROPIC)
+        """Live-provider dispatches completed in this process or persisted in the ledger."""
+        with self._lock:
+            recorded = self._recorded_live_calls(run_id)
+            completed = max(self._completed_live_calls.get(run_id, 0), recorded)
+            self._completed_live_calls[run_id] = completed
+            return completed
+
+    def try_reserve_live_call(self, run_id: str) -> bool:
+        """Atomically reserve one of the run's live-call slots.
+
+        The reservation remains visible to competing callers until ``finish_live_call`` moves
+        it to the completed count. Thus a burst cannot pass the bound between the budget check
+        and provider dispatch.
+        """
+        with self._lock:
+            reservations = self._live_call_reservations.get(run_id, 0)
+            if self.live_calls(run_id) + reservations >= MAX_CALLS_PER_RUN:
+                return False
+            self._live_call_reservations[run_id] = reservations + 1
+            return True
+
+    def finish_live_call(self, run_id: str) -> None:
+        """Consume one reservation after a provider dispatch, including exceptional exits."""
+        with self._lock:
+            reservations = self._live_call_reservations.get(run_id, 0)
+            if reservations <= 1:
+                self._live_call_reservations.pop(run_id, None)
+            else:
+                self._live_call_reservations[run_id] = reservations - 1
+            recorded = self._recorded_live_calls(run_id)
+            completed = max(self._completed_live_calls.get(run_id, 0), recorded) + 1
+            self._completed_live_calls[run_id] = completed
 
     def budget_exhausted(self, run_id: str) -> bool:
-        return self.count(run_id) >= MAX_CALLS_PER_RUN
+        with self._lock:
+            return (
+                self.live_calls(run_id) + self._live_call_reservations.get(run_id, 0)
+                >= MAX_CALLS_PER_RUN
+            )
 
     def new_call_id(self, run_id: str) -> str:
         return f"ai-{self.count(run_id) + 1:03d}-{uuid.uuid4().hex[:8]}"

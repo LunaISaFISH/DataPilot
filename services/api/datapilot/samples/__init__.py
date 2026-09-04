@@ -16,9 +16,7 @@ from pathlib import Path
 
 from datapilot.contracts.models import SampleInfo
 from datapilot.samples import clinical_nlp, ecommerce_orders, hr_roster, uci_online_retail
-
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
-FIXTURES_ROOT = PROJECT_ROOT / "fixtures"
+from datapilot.samples._paths import FIXTURES_ROOT, PROJECT_ROOT
 
 
 @dataclass(frozen=True)

@@ -19,6 +19,8 @@ primary_region = "nrt"   # Tokyo: Anthropic API reachable; acceptable latency fr
   DATAPILOT_SEED_SAMPLES = "1"
   DATAPILOT_RUN_RETENTION_HOURS = "24"
   DATAPILOT_AI_DAILY_CALL_CAP = "400"
+  DATAPILOT_UPLOADS_PER_MINUTE = "10"
+  DATAPILOT_AI_REQUESTS_PER_HOUR = "20"
   PYTHONUNBUFFERED = "1"
 
 [http_service]

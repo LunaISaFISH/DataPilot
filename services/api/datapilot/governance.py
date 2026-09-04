@@ -57,6 +57,7 @@ from datapilot.engine import (
     parse_csv,
     record_uids,
 )
+from datapilot.engine.profile import overall_score
 from datapilot.serialization import canonical_json
 
 DEMO_REASON_ZH = {
@@ -575,11 +576,24 @@ def _changed_cells(source: pl.DataFrame, candidate: pl.DataFrame) -> dict[str, l
     return changed
 
 
-def _display_keys(frame: pl.DataFrame, contract: DataContract | None) -> list[str]:
+def _display_keys(
+    frame: pl.DataFrame,
+    contract: DataContract | None,
+    withheld: set[str],
+) -> list[str]:
     keys = list(contract.business_key) if contract is not None else []
     if keys and all(key in frame.columns for key in keys):
         parts = [frame.get_column(key).fill_null("").to_list() for key in keys]
-        return ["|".join(str(value) for value in row) for row in zip(*parts, strict=True)]
+        sensitive = withheld | (
+            set(contract.sensitive_fields()) if contract is not None else set()
+        )
+        return [
+            "|".join(
+                mask_value(str(value)) if key in sensitive else str(value)
+                for key, value in zip(keys, row, strict=True)
+            )
+            for row in zip(*parts, strict=True)
+        ]
     return [str(ordinal) for ordinal in range(frame.height)]
 
 
@@ -609,8 +623,9 @@ def preview_changes(
     frame, _encoding = parse_csv(source)
     uids = record_uids(report.profile.dataset_hash, frame.height)
     applied = _apply_actions(frame, dry_run, uids)
-    keys = _display_keys(frame, contract)
-    mask = _masker(set(report.sensitive_preflight.columns_withheld))
+    withheld = set(report.sensitive_preflight.columns_withheld)
+    keys = _display_keys(frame, contract, withheld)
+    mask = _masker(withheld)
     changes: list[ChangePreviewItem] = []
     total_cells = 0
     changed = _changed_cells(frame, applied.frame)
@@ -741,7 +756,7 @@ def execute(
     candidate = applied.frame
     withheld = set(report.sensitive_preflight.columns_withheld)
     mask = _masker(withheld)
-    keys = _display_keys(frame, active)
+    keys = _display_keys(frame, active, withheld)
 
     # -- change ledger ---------------------------------------------------------------
     changed = _changed_cells(frame, candidate)
@@ -839,12 +854,14 @@ def execute(
     # Business-key surplus is a property of the source scope; keep the report's value.
     baseline_unique = next((m for m in report.profile.metrics if m.name == "uniqueness"), None)
     if baseline_unique is not None:
+        candidate_metrics = [
+            baseline_unique if metric.name == "uniqueness" else metric
+            for metric in candidate_profile.metrics
+        ]
         candidate_profile = candidate_profile.model_copy(
             update={
-                "metrics": [
-                    baseline_unique if metric.name == "uniqueness" else metric
-                    for metric in candidate_profile.metrics
-                ]
+                "metrics": candidate_metrics,
+                "overall_score": overall_score(candidate_metrics, active),
             }
         )
 

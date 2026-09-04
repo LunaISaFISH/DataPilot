@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from datapilot.api.main import Settings, create_app
@@ -497,6 +498,67 @@ def test_restart_safety_new_app_reads_run_from_disk(settings: Settings) -> None:
         assert dry.status_code == 200
 
 
+def test_apply_recovers_after_completed_execution_finalization_is_interrupted(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = create_app(settings)
+    body: dict[str, Any]
+    with TestClient(app, raise_server_exceptions=False) as first:
+        created = first.post(
+            "/v1/runs",
+            files={
+                "file": ("sample.csv", SMALL_CSV, "text/csv"),
+                "policy": ("contract.yaml", SMALL_CONTRACT, "application/yaml"),
+            },
+        )
+        run_id = str(created.json()["run_id"])
+        dry_run = first.post(f"/v1/runs/{run_id}/dry-run").json()["dry_run"]
+        body = {
+            "run_revision": 1,
+            "approved_action_set_hash": dry_run["approved_action_set_hash"],
+            "idempotency_key": "recover-apply-0001",
+        }
+        store = app.state.context.store
+        write_json = store.write_json
+
+        def interrupt_completed_state(target_run_id: str, name: str, obj: Any) -> Path:
+            if name == "apply-idempotency.json" and isinstance(obj, dict) and (
+                obj.get("state") == "COMPLETED"
+            ):
+                raise OSError("injected finalization interruption")
+            return write_json(target_run_id, name, obj)
+
+        monkeypatch.setattr(store, "write_json", interrupt_completed_state)
+        interrupted = first.post(f"/v1/runs/{run_id}/apply", json=body)
+
+        assert interrupted.status_code == 500
+        assert store.has(run_id, "execution.json")
+        assert store.read_json(run_id, "apply-idempotency.json")["state"] == "PENDING"
+        assert store.read_meta(run_id)["lifecycle"] == "DRY_RUN_READY"
+        assert first.get(f"/v1/runs/{run_id}").json()["execution"] is None
+        visible = {item["name"] for item in first.get(f"/v1/runs/{run_id}/artifacts").json()}
+        assert "release.csv" not in visible
+        pending_release = first.get(f"/v1/runs/{run_id}/artifacts/release.csv")
+        assert pending_release.status_code == 409
+        assert pending_release.json()["error"]["code"] == "APPLY_INCOMPLETE"
+
+    restarted = create_app(settings)
+    with TestClient(restarted) as second:
+        recovered = second.post(f"/v1/runs/{run_id}/apply", json=body)
+        replayed = second.post(f"/v1/runs/{run_id}/apply", json=body)
+        recovered_store = restarted.state.context.store
+
+        assert recovered.status_code == 200
+        assert recovered.headers["X-Idempotent-Replay"] == "true"
+        assert replayed.status_code == 200
+        assert replayed.json() == recovered.json()
+        assert recovered_store.read_meta(run_id)["lifecycle"] == "APPLIED"
+        assert recovered_store.read_json(run_id, "apply-idempotency.json")["state"] == "COMPLETED"
+        assert sum(event.stage == "APPLIED" for event in recovered_store.read_events(run_id)) == 1
+        assert second.get(f"/v1/runs/{run_id}").json()["execution"] is not None
+        assert second.get(f"/v1/runs/{run_id}/artifacts/release.csv").status_code == 200
+
+
 def test_delete_run_and_bulk_cleanup(client: TestClient) -> None:
     run_a = _create_sample_run(client)
     created = client.post("/v1/runs", files={"file": ("sample.csv", SMALL_CSV, "text/csv")})
@@ -707,10 +769,13 @@ def test_redteam_cases_are_stored_outside_the_report(client: TestClient, data_di
         f"/v1/runs/{run_id}/findings/{finding_id}/redteam", json={"case": "TIMEOUT"}
     )
     assert timeout.status_code == 200
-    assert timeout.json()["status"] == "timeout"
+    assert timeout.json()["status"] == "fallback_deterministic"
     assert timeout.json()["ledger_call_id"]
     ledger = client.get(f"/v1/runs/{run_id}/ai-ledger").json()
-    assert any(r["task"] == "redteam" and r["status"] == "timeout" for r in ledger)
+    timeout_record = next(r for r in ledger if r["task"] == "redteam")
+    assert timeout_record["provider"] == "deterministic"
+    assert timeout_record["status"] == "fallback_deterministic"
+    assert "fallback_reason=timeout" in timeout_record["error"]
 
     # Second run of the same case gets the next sequence number.
     again = client.post(

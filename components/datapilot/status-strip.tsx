@@ -1,7 +1,26 @@
 'use client';
 
+import { ServerCog } from 'lucide-react';
+import { useState } from 'react';
+
 import { LanguageToggle } from '@/components/language-toggle';
-import { useHealth } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  clearApiBaseOverride,
+  normalizeApiBase,
+  resolveApiBase,
+  setApiBaseOverride,
+  useHealth,
+} from '@/lib/api';
 import { formatInt } from '@/lib/format';
 import { useLanguage } from '@/lib/language';
 import { cn } from '@/lib/utils';
@@ -38,7 +57,39 @@ function Item({ children, className, title }: { children: React.ReactNode; class
 /** Top status strip: API connectivity, engine version, AI provider/model, sample count, language. */
 export function StatusStrip({ className, intervalMs }: StatusStripProps) {
   const { t, language } = useLanguage();
-  const { health, error, loading } = useHealth(intervalMs);
+  const { health, error, loading, apiBase, apiBaseSource } = useHealth(intervalMs);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draft, setDraft] = useState(apiBase ?? '');
+  const [validationError, setValidationError] = useState(false);
+  const [savedMessage, setSavedMessage] = useState(false);
+
+  const sourceLabel =
+    apiBaseSource === 'query'
+      ? t('URL parameter', 'URL 参数')
+      : apiBaseSource === 'storage'
+        ? t('Saved override', '已保存覆盖')
+        : apiBaseSource === 'environment'
+          ? t('Environment', '环境变量')
+          : t('Local default', '本地默认');
+
+  const saveApiBase = () => {
+    setSavedMessage(false);
+    const normalized = normalizeApiBase(draft);
+    if (!normalized || !setApiBaseOverride(normalized)) {
+      setValidationError(true);
+      return;
+    }
+    setDraft(normalized);
+    setValidationError(false);
+    setSavedMessage(true);
+  };
+
+  const clearOverride = () => {
+    clearApiBaseOverride();
+    setDraft(resolveApiBase());
+    setValidationError(false);
+    setSavedMessage(true);
+  };
 
   const connected = health !== null;
   const noBase = error?.code === 'NO_API_BASE';
@@ -93,6 +144,104 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
         ) : null}
       </div>
       <div className="flex items-center gap-2 px-2">
+        <Popover
+          open={settingsOpen}
+          onOpenChange={(open) => {
+            setSettingsOpen(open);
+            if (open) {
+              setDraft(apiBase ?? '');
+              setValidationError(false);
+              setSavedMessage(false);
+            }
+          }}
+        >
+          <PopoverTrigger
+            className="inline-flex h-8 min-w-0 max-w-[42vw] items-center gap-1.5 rounded-md border border-border bg-card px-2 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-7 sm:max-w-64"
+            aria-label={t('Configure backend API', '配置后端 API')}
+            title={apiBase ?? undefined}
+          >
+            <ServerCog aria-hidden="true" className="size-3.5 shrink-0" />
+            <span className="shrink-0">{t('Backend', '后端')}</span>
+            <span className="mono min-w-0 truncate text-[10px] text-muted-foreground">{apiBase}</span>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[min(22rem,calc(100vw-1rem))] gap-3 p-3">
+            <PopoverHeader>
+              <PopoverTitle>{t('Backend API', '后端 API')}</PopoverTitle>
+              <PopoverDescription>
+                {t(
+                  'Switch the live API for this browser. Health reconnects immediately.',
+                  '切换此浏览器使用的实时 API，健康检查会立即重连。',
+                )}
+              </PopoverDescription>
+            </PopoverHeader>
+
+            <div className="rounded-md border border-border bg-muted/30 p-2">
+              <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                <span>{t('Current address', '当前地址')}</span>
+                <span>{sourceLabel}</span>
+              </div>
+              <code className="mt-1 block break-all text-xs text-foreground">{apiBase}</code>
+            </div>
+
+            <form
+              className="space-y-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveApiBase();
+              }}
+            >
+              <label className="block text-xs font-medium" htmlFor="datapilot-api-base">
+                {t('API base URL', 'API 基础地址')}
+              </label>
+              <Input
+                id="datapilot-api-base"
+                value={draft}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  setValidationError(false);
+                  setSavedMessage(false);
+                }}
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="http://localhost:8000"
+                aria-invalid={validationError || undefined}
+                aria-describedby="datapilot-api-help"
+                className="mono h-9 text-sm"
+              />
+              <p
+                id="datapilot-api-help"
+                className={cn('text-[11px] leading-4 text-muted-foreground', validationError && 'text-blocker')}
+                role={validationError ? 'alert' : undefined}
+              >
+                {validationError
+                  ? t(
+                      'Enter a full HTTP(S) URL without credentials, query, or fragment.',
+                      '请输入不含凭据、查询参数或片段的完整 HTTP(S) 地址。',
+                    )
+                  : savedMessage
+                    ? t('Saved. Reconnecting health check…', '已保存，正在重连健康检查…')
+                    : t('Stored only in this browser; credentials are rejected.', '仅保存在此浏览器；不接受含凭据的地址。')}
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-9 sm:min-h-7"
+                  onClick={clearOverride}
+                  disabled={apiBaseSource !== 'query' && apiBaseSource !== 'storage'}
+                >
+                  {t('Clear override', '清除覆盖')}
+                </Button>
+                <Button type="submit" size="sm" className="min-h-9 sm:min-h-7">
+                  {t('Save & reconnect', '保存并重连')}
+                </Button>
+              </div>
+            </form>
+          </PopoverContent>
+        </Popover>
         <LanguageToggle />
       </div>
     </div>

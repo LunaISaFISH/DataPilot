@@ -142,6 +142,15 @@ def test_invalid_yaml() -> None:
     assert error.message_zh and error.message_en
 
 
+def test_invalid_yaml_error_does_not_echo_source_content() -> None:
+    sentinel = "alice.sentinel@example.test"
+    error = _parse_error(f"id: test\nsecret: [{sentinel}\n")
+    assert sentinel not in error.message_zh
+    assert sentinel not in error.message_en
+    assert "第 3 行" in error.message_zh
+    assert "line 3" in error.message_en
+
+
 def test_non_mapping_documents() -> None:
     assert _parse_error("- just\n- a list\n").code == "CONTRACT_NOT_MAPPING"
     assert _parse_error("plain string").code == "CONTRACT_NOT_MAPPING"

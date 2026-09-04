@@ -463,7 +463,7 @@ def run(args: argparse.Namespace) -> int:
                 )
             reasons = verdict["grounding"]["reason_codes"]
             print(f"  redteam {case}: status={verdict['status']} reasons={reasons}")
-        _, after = client.call("GET", f"/v1/runs/{run_id}")[1:]
+        _, after, _ = client.call("GET", f"/v1/runs/{run_id}")
         _require(after["lifecycle"] == "APPLIED", "red-team changed the run lifecycle")
 
     brief_deadline = time.monotonic() + args.timeout

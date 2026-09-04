@@ -149,6 +149,24 @@ def test_json_artifacts_accept_models_and_dicts(store: RunStore) -> None:
         store.remove("run-4", "source.csv")
 
 
+@pytest.mark.parametrize("name", ["source.csv", "meta.json"])
+@pytest.mark.parametrize("writer", ["write_bytes", "write_json"])
+def test_generic_writers_cannot_overwrite_protected_artifacts(
+    store: RunStore, name: str, writer: str
+) -> None:
+    store.create("protected", b"a\n1\n", "x.csv", None, None)
+    before = store.path("protected", name).read_bytes()
+
+    with pytest.raises(StorageError) as info:
+        if writer == "write_bytes":
+            store.write_bytes("protected", name, b"tampered")
+        else:
+            store.write_json("protected", name, {"tampered": True})
+
+    assert info.value.code == "ARTIFACT_PROTECTED"
+    assert store.path("protected", name).read_bytes() == before
+
+
 def test_events_are_monotonic_and_survive_reopen(store: RunStore, tmp_path: Path) -> None:
     store.create("run-5", b"a\n", "x.csv", None, None)
     first = store.append_event("run-5", "INGESTING", EventStatus.STARTED, "开始", "start")

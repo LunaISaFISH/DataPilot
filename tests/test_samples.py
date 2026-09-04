@@ -15,6 +15,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 from datapilot.contracts.models import (
@@ -37,6 +38,7 @@ from datapilot.samples import clinical_nlp as clinical
 from datapilot.samples import ecommerce_orders as eo
 from datapilot.samples import hr_roster as hr
 from datapilot.samples import uci_online_retail as uci
+from datapilot.samples._paths import resolve_fixtures_root
 
 # sha256 of the clinical generator output (spec §8 variants included); the golden artifacts
 # under fixtures/clinical_nlp/golden depend on it.
@@ -136,6 +138,13 @@ def test_generators_are_deterministic_utf8_csv(sample_id: str) -> None:
     assert len(rows) == sample.rows
     assert all(len(row) == sample.columns for row in rows)
     assert all(value is not None for row in rows for value in row.values())
+
+
+def test_fixtures_resolve_from_container_working_directory(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "runtime"
+    fixtures_root = runtime_root / "fixtures"
+    fixtures_root.mkdir(parents=True)
+    assert resolve_fixtures_root(tmp_path / "installed", runtime_root) == fixtures_root
 
 
 @pytest.mark.parametrize("sample_id", sorted(SAMPLES))

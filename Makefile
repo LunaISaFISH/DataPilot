@@ -1,4 +1,4 @@
-.PHONY: test api web demo demo-reset golden
+.PHONY: test api web demo demo-reset demo-prewarm demo-smoke e2e-smoke golden
 
 PY := .venv/bin/python
 API_HOST ?= 127.0.0.1
@@ -34,16 +34,27 @@ demo:
 	NEXT_PUBLIC_API_BASE_URL=$(API_URL) npm run dev -- --port $(WEB_PORT) --host 127.0.0.1; \
 	wait
 
-# Booth reset against a running API: delete every run, then seed the three sample runs with
+# Booth reset against a running API: delete every run, then seed the four sample runs with
 # contracts plus one observational ecommerce run.
 demo-reset:
 	@curl -fsS -X DELETE "$(API_URL)/v1/runs?older_than_minutes=0"; echo
-	@for sample in clinical_nlp ecommerce_orders hr_roster; do \
+	@for sample in clinical_nlp ecommerce_orders hr_roster uci_online_retail; do \
 	  curl -fsS -X POST "$(API_URL)/v1/runs/from-sample" -H 'Content-Type: application/json' \
 	    -d "{\"sample_id\": \"$$sample\", \"with_contract\": true}"; echo; \
 	done
 	@curl -fsS -X POST "$(API_URL)/v1/runs/from-sample" -H 'Content-Type: application/json' \
 	  -d '{"sample_id": "ecommerce_orders", "with_contract": false}'; echo
+
+# Populate the on-disk Anthropic fallback cache for all sample semantic calls and injection
+# checks. The script refuses to pretend it warmed the cache when Anthropic is unavailable.
+demo-prewarm:
+	DATAPILOT_AI_CACHE=fallback PYTHONPATH=services/api $(PY) scripts/demo_prewarm.py
+
+demo-smoke:
+	$(PY) scripts/demo_smoke.py --base "$(API_URL)" --sample uci_online_retail --timeout 180
+
+e2e-smoke:
+	node scripts/e2e_smoke.mjs --web http://127.0.0.1:$(WEB_PORT)
 
 # Regenerate the clinical golden artifacts and public/demo replay files (replay AI mode).
 golden:

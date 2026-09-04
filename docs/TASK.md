@@ -1,38 +1,41 @@
 # Current task
 
-## Status
+Updated: 2026-09-04 (Asia/Singapore)
 
-- Branch: `main`
-- Repository started from an empty remote.
-- Sites capability scaffold created with UI primitives, D1, R2, and authenticated-route support.
-- Python contracts, deterministic synthetic fixture, Polars engine, policy decisions, dry run,
-  deterministic executor, validation gate, artifacts, and synchronous API are implemented.
-- The bilingual mobile dashboard supports live CSV + YAML upload and a complete verified replay.
-- Replay state restores safely; offline assets, cleaned CSV, manifest, report, and social preview
-  are generated from engine output.
-- Local verification: 24 pytest tests, Ruff, strict mypy, frontend lint, production build, full
-  390x844 Chinese flow, and real 5,200-row browser upload all pass.
-- Docker Compose builds both services and starts a healthy API plus a working Web container.
-- GitHub `main` is synchronized at `83e5875`; all commits are authored and committed as
-  `LunaISaFISH <65061532+LunaISaFISH@users.noreply.github.com>`.
-- The opt-in Anthropic smoke on 2026-09-04 verified a grounded Haiku 4.5 proposal with five
-  affected records. The single Sonnet 4.6 quality attempt timed out and failed closed; it did not
-  create an action. No further paid retry was made.
+## Delivered
 
-## Next
+- Branch `main`; current committed base `f187d95df588`, one commit ahead of `origin/main` before this working set.
+- Real v0.2 frontend/backend integration completed for clinical, e-commerce, HR, and UCI samples; observational upload and AI-assisted contract drafting also exercised.
+- Demo operations exist: `make demo-reset`, `make demo-prewarm`, `scripts/demo_smoke.py`, and `scripts/e2e_smoke.mjs`.
+- Three backend adversarial reviews completed. Fixes cover immutable source/meta protection, recoverable apply state, masked business keys, score consistency, honest fallback attribution, concurrent daily-call reservation, safe YAML errors, and formula-risk disclosure.
+- Public mode implements per-client upload/AI limits, persistent global AI budget, 24-hour visitor cleanup, protected sample seeds, and startup prewarm. The frontend supports safe runtime backend switching.
+- Fly app `datapilotgo-api` is live in `nrt` on machine `683615ebee7668`, image `deployment-01M1PBDPV0XJ056PE5EWWHM0Y7`; health check is passing and the 3 GB `datapilot_data` volume is attached.
+- Public UCI smoke passed end to end: 42,481 records, 7 findings, source score 89.43, grounded Anthropic `EIRE → Ireland` mapping across an engine-recounted 403 records, candidate score 95.92, 25,653 eligible, 16,341 quarantined, 487 excluded from the release package, 14/14 validations, final `CONDITIONAL_PASS`, and offline verify success.
+- Public web-to-Fly CORS connection was browser-tested through the runtime `?api=` override.
 
-1. Attach a protected FastAPI runtime URL when deployment credentials are available.
-2. If a longer semantic timeout is intentionally approved later, rerun only the Sonnet quality
-   sample; the low-cost model and full deterministic fallback are already verified.
+## Verification
 
-## Deployment
+- Final full local gate: 271 pytest tests, Ruff, mypy `--strict` across 38 source files, oxlint, and production frontend build all passed.
+- Deployment-specific coverage includes installed-container fixture resolution and public runtime limiting.
+- `docs/SAMPLES.md` and the frozen clinical replay agree with `fixtures/clinical_nlp/golden/report.json`: 99.27 → 99.61, 9 findings, 316 transformed cells, 56 quarantined, 43 duplicate release exclusions, 5,101 eligible, 14/14 validations.
 
-The existing public Site `DataPilot` was recovered and is available through the custom domain
-`https://datapilotgo.com`. Production smoke checks pass for the
-dashboard, replay, reports, cleaned CSV, and release manifest. It can be opened without a GPT login
-for recruitment-event scanning. The hosted preview is deliberately replay-only until a protected
-FastAPI runtime is attached; the complete live product runs locally through Docker Compose.
+## Deployment state
 
-The source repository is available at `https://github.com/LunaISaFISH/DataPilot`. The only remaining
-deployment limitation is the absence of a protected public FastAPI runtime URL; no alternate backend
-or misleading live-mode claim was introduced.
+- API: `https://datapilotgo-api.fly.dev`; `/health` reports engine/API 0.2.0, Anthropic ready, public mode enabled, four protected seeds, writable storage, and non-secret budget counters.
+- Model secret name is present in Fly; its value was never printed by this work.
+- Frontend: existing `https://datapilotgo.com` still serves the prior Sites build until the owner rebuilds the existing Site with `NEXT_PUBLIC_API_BASE_URL=https://datapilotgo-api.fly.dev`.
+- Current Fly image was built from the reviewed working tree before a final git commit. After owner approval, commit as `LunaISaFISH <65061532+LunaISaFISH@users.noreply.github.com>`, push, and optionally redeploy to bind the public runtime to that immutable revision.
+
+## Remaining owner actions
+
+1. Approve or decline the prepared git commit; no commit has been created without approval.
+2. Push `main` after the approved commit.
+3. Rebuild the existing OpenAI Site with the public API environment parameter; do not create a second Site.
+4. On the event morning run the checklist in `docs/DEMO.md`, including phone-network smoke and prewarming.
+
+## Known limits
+
+- Public demo is a single Fly machine and local filesystem store, not a multi-region or multi-tenant production service.
+- Current P0 input boundary is CSV ≤ 25 MiB, ≤ 250,000 physical rows, and ≤ 200 columns.
+- Browser runtime API override is intentionally restricted to credential-free HTTP(S) origins.
+- The deterministic fallback preserves safety and availability but may produce different UCI release membership because the 403-cell semantic mapping is withheld.

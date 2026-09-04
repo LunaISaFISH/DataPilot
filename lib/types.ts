@@ -646,8 +646,8 @@ export type RedteamResult = {
 
 export type GroundingReasonGloss = {
   code: string;
-  zh: string;
-  en: string;
+  gloss_zh: string;
+  gloss_en: string;
 };
 
 /** `GET /v1/ai/contract` — what the running backend actually does, read from code (§5.6). */
@@ -665,7 +665,7 @@ export type AiContract = {
   never_visible: string[];
   /** Action types the model may propose; `null` means "no proposal (abstain)". */
   allowed_proposals: (AllowedAction | null)[];
-  grounding_reason_codes: GroundingReasonGloss[];
+  grounding_reason_codes: Record<AITask, GroundingReasonGloss[]>;
   /** Lets the browser verify its SHA-256 implementation: sha256(utf8(json)) must equal `sha256`. */
   canonical_test_vector: { json: string; sha256: string };
 };
@@ -681,4 +681,3 @@ export type SemanticRerunResult = {
   finding: Finding;
   ledger_call_id: string | null;
 };
-

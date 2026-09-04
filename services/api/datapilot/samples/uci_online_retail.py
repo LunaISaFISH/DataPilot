@@ -8,10 +8,9 @@ is never regenerated; ``tests/test_samples.py`` pins its sha256). The quality is
 
 from __future__ import annotations
 
-from pathlib import Path
+from datapilot.samples._paths import FIXTURES_ROOT
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
-FIXTURE_DIR = PROJECT_ROOT / "fixtures" / "uci_online_retail"
+FIXTURE_DIR = FIXTURES_ROOT / "uci_online_retail"
 CSV_PATH = FIXTURE_DIR / "online_retail_2010_12.csv"
 PROVENANCE_PATH = FIXTURE_DIR / "PROVENANCE.md"
 

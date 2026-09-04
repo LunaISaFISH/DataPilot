@@ -50,19 +50,26 @@ def invoke(ctx: TaskContext, task: AITask, payload: dict[str, Any]) -> Invocatio
     """Call the configured provider unless the per-run budget is exhausted (spec §5.5)."""
     provider: LLMProvider = ctx.provider
     note: str | None = None
-    if provider.name is ProviderName.ANTHROPIC and ctx.ledger.budget_exhausted(ctx.run_id):
-        provider = ctx.fallback
-        note = BUDGET_EXCEEDED
+    live_reserved = False
+    if provider.name is ProviderName.ANTHROPIC:
+        live_reserved = ctx.ledger.try_reserve_live_call(ctx.run_id)
+        if not live_reserved:
+            provider = ctx.fallback
+            note = BUDGET_EXCEEDED
     prompt_task = AITask.SEMANTIC if task is AITask.REDTEAM else task
-    result = provider.complete_json(
-        prompt_task,
-        SYSTEM_PROMPTS[prompt_task],
-        payload,
-        OUTPUT_SCHEMAS[prompt_task],
-        effort=EFFORT[prompt_task],
-        max_tokens=MAX_TOKENS[prompt_task],
-        timeout_s=TIMEOUT_SECONDS[prompt_task],
-    )
+    try:
+        result = provider.complete_json(
+            prompt_task,
+            SYSTEM_PROMPTS[prompt_task],
+            payload,
+            OUTPUT_SCHEMAS[prompt_task],
+            effort=EFFORT[prompt_task],
+            max_tokens=MAX_TOKENS[prompt_task],
+            timeout_s=TIMEOUT_SECONDS[prompt_task],
+        )
+    finally:
+        if live_reserved:
+            ctx.ledger.finish_live_call(ctx.run_id)
     return Invocation(result=result, provider=provider, note=note)
 
 
@@ -82,10 +89,12 @@ def fallback_result(ctx: TaskContext, task: AITask, payload: dict[str, Any]) -> 
 def final_status(invocation: Invocation, *, grounded: bool, abstained: bool) -> AIStatus:
     """Ledger status for one task invocation (never labels deterministic work as AI)."""
     result = invocation.result
-    if not result.ok:
-        return result.status
+    if result.status in (AIStatus.REFUSAL, AIStatus.TIMEOUT, AIStatus.ERROR):
+        return AIStatus.FALLBACK_DETERMINISTIC
     if invocation.deterministic:
         return AIStatus.FALLBACK_DETERMINISTIC
+    if not result.ok:
+        return result.status
     if not grounded:
         return AIStatus.REJECTED_BY_GROUNDING
     if abstained:
@@ -108,15 +117,31 @@ def record_call(
 ) -> AICallRecord:
     result = invocation.result
     prompt_task = AITask.SEMANTIC if task is AITask.REDTEAM else task
-    error_parts = [part for part in (result.error, invocation.note) if part]
+    delivered_by_fallback = status is AIStatus.FALLBACK_DETERMINISTIC
+    provider = ctx.fallback if delivered_by_fallback else invocation.provider
+    model_served = ctx.fallback.model if delivered_by_fallback else result.model_served
+    error_parts: list[str] = []
+    if delivered_by_fallback and not invocation.deterministic:
+        error_parts.extend(
+            (
+                f"attempted_provider={invocation.provider.name.value}",
+                f"fallback_reason={result.status.value}",
+            )
+        )
+    elif invocation.note is not None:
+        error_parts.append(f"fallback_reason={invocation.note}")
+    if result.error:
+        error_parts.append(result.error)
+    if invocation.note and invocation.note not in " ".join(error_parts):
+        error_parts.append(invocation.note)
     record = build_record(
         call_id=ctx.ledger.new_call_id(ctx.run_id),
         run_id=ctx.run_id,
         task=task,
         finding_id=finding_id,
-        provider=invocation.provider.name,
+        provider=provider.name,
         model_requested=invocation.provider.model,
-        model_served=result.model_served,
+        model_served=model_served,
         prompt_version=PROMPT_VERSIONS[prompt_task],
         input_hash=input_hash,
         request_payload=request_payload,

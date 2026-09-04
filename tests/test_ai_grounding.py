@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import pytest
+from datapilot.ai import AIRuntime, get_runtime
 from datapilot.ai.grounding import (
     REDTEAM_OFFLINE_CASES,
     number_tokens,
@@ -16,12 +20,110 @@ from datapilot.ai.grounding import (
     validate_proposal,
     verify_numbers,
 )
+from datapilot.ai.provider import DeterministicProvider, ProviderResult
 from datapilot.ai.redaction import build_facts_payload
-from datapilot.contracts.models import AIProposal, ContractDraft, SemanticRequest
+from datapilot.contracts.models import (
+    AIProposal,
+    AIStatus,
+    AITask,
+    ContractDraft,
+    ProviderName,
+    SemanticRequest,
+)
 from datapilot.contracts.policy import parse_contract
 from pydantic import ValidationError
 
 from tests.test_ai_redaction import CANARY, make_report, make_request
+
+
+class _FailingAnthropic:
+    name = ProviderName.ANTHROPIC
+    model = "synthetic-live-model"
+
+    def __init__(self, status: AIStatus) -> None:
+        self.status = status
+
+    def complete_json(
+        self,
+        task: AITask,
+        system: str,
+        user_payload: dict[str, Any],
+        schema: dict[str, Any],
+        *,
+        effort: str,
+        max_tokens: int,
+        timeout_s: float,
+    ) -> ProviderResult:
+        return ProviderResult(
+            data=None,
+            status=self.status,
+            model_served=None,
+            input_tokens=11,
+            output_tokens=0,
+            cache_read_tokens=0,
+            latency_ms=3,
+            request_id="synthetic-request",
+            error=f"synthetic {self.status.value}",
+        )
+
+
+class _BlockingAnthropic:
+    name = ProviderName.ANTHROPIC
+    model = "synthetic-live-model"
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self._condition = threading.Condition()
+        self._release = threading.Event()
+        self._deterministic = DeterministicProvider()
+
+    def complete_json(
+        self,
+        task: AITask,
+        system: str,
+        user_payload: dict[str, Any],
+        schema: dict[str, Any],
+        *,
+        effort: str,
+        max_tokens: int,
+        timeout_s: float,
+    ) -> ProviderResult:
+        with self._condition:
+            self.calls += 1
+            self._condition.notify_all()
+        if not self._release.wait(timeout=5):
+            raise TimeoutError("test did not release the synthetic provider")
+        return self._deterministic.complete_json(
+            task,
+            system,
+            user_payload,
+            schema,
+            effort=effort,
+            max_tokens=max_tokens,
+            timeout_s=timeout_s,
+        )
+
+    def wait_for_calls(self, count: int) -> bool:
+        deadline = time.monotonic() + 5
+        with self._condition:
+            while self.calls < count:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self._condition.wait(remaining)
+        return True
+
+    def release(self) -> None:
+        self._release.set()
+
+
+def _run_ai_task(runtime: AIRuntime, run_id: str, task: AITask) -> None:
+    if task is AITask.SEMANTIC:
+        runtime.semantic(run_id, make_request())
+    elif task is AITask.CONTRACT_DRAFT:
+        runtime.draft_contract(run_id, make_report())
+    else:
+        runtime.brief(run_id, make_report(), None)
 
 
 def grounded_proposal(request: SemanticRequest, **overrides: Any) -> AIProposal:
@@ -293,3 +395,58 @@ def test_brief_grounding_flags_invented_numbers_and_unknown_facts() -> None:
     assert claims[3].reason is not None and "UNVERIFIED_NUMBER:42" in claims[3].reason
     assert claims[4].reason is not None and "UNKNOWN_FACT:made_up_fact" in claims[4].reason
     assert verify_numbers("98.7", facts) == ["98.7"]
+
+
+# -- shared task supervision ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("task", [AITask.SEMANTIC, AITask.CONTRACT_DRAFT, AITask.BRIEF])
+@pytest.mark.parametrize("failure", [AIStatus.REFUSAL, AIStatus.TIMEOUT, AIStatus.ERROR])
+def test_provider_failure_records_the_delivered_deterministic_fallback(
+    task: AITask, failure: AIStatus
+) -> None:
+    run_id = f"fallback-{task.value}-{failure.value}"
+    runtime = get_runtime(provider=_FailingAnthropic(failure), mode="auto")
+
+    _run_ai_task(runtime, run_id, task)
+
+    record = runtime.ledger_records(run_id)[0]
+    assert record.provider is ProviderName.DETERMINISTIC
+    assert record.status is AIStatus.FALLBACK_DETERMINISTIC
+    assert record.model_requested == _FailingAnthropic.model
+    assert record.model_served == DeterministicProvider().model
+    assert record.error is not None
+    assert "attempted_provider=anthropic" in record.error
+    assert f"fallback_reason={failure.value}" in record.error
+
+
+def test_mixed_concurrent_tasks_cannot_overrun_the_live_call_budget() -> None:
+    workers = 12
+    run_id = "concurrent-mixed-budget"
+    start = threading.Barrier(workers)
+    provider = _BlockingAnthropic()
+    runtime = get_runtime(provider=provider, mode="auto")
+    tasks = [AITask.SEMANTIC, AITask.CONTRACT_DRAFT, AITask.BRIEF] * 4
+
+    def run(task: AITask) -> None:
+        start.wait(timeout=5)
+        _run_ai_task(runtime, run_id, task)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(run, task) for task in tasks]
+        reached_limit = provider.wait_for_calls(8)
+        time.sleep(0.1)
+        calls_before_release = provider.calls
+        provider.release()
+        for future in futures:
+            future.result(timeout=5)
+
+    records = runtime.ledger_records(run_id)
+    assert reached_limit is True
+    assert calls_before_release == 8
+    assert provider.calls == 8
+    assert runtime.ledger.live_calls(run_id) == 8
+    assert len(records) == workers
+    assert {record.task for record in records} == set(tasks)
+    assert sum(record.provider is ProviderName.ANTHROPIC for record in records) == 8
+    assert sum(record.status is AIStatus.FALLBACK_DETERMINISTIC for record in records) == 4

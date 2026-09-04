@@ -217,8 +217,10 @@ def test_anthropic_refusal_falls_back_and_is_labelled() -> None:
     proposal, grounding, _ = runtime.semantic_resolver(RUN_ID).resolve(request, run_id=RUN_ID)
 
     record = runtime.ledger_records(RUN_ID)[0]
-    assert record.status is AIStatus.REFUSAL
-    assert record.provider is ProviderName.ANTHROPIC
+    assert record.status is AIStatus.FALLBACK_DETERMINISTIC
+    assert record.provider is ProviderName.DETERMINISTIC
+    assert record.error is not None and "attempted_provider=anthropic" in record.error
+    assert "fallback_reason=refusal" in record.error
     assert proposal.provider == "deterministic"
     assert proposal.abstained is True
     assert grounding.valid is True
@@ -228,12 +230,17 @@ def test_anthropic_timeout_and_errors_are_recorded() -> None:
     request = make_request()
     timed_out = live_runtime(FakeClient(error=TimeoutError("slow")))
     timed_out.semantic_resolver(RUN_ID).resolve(request, run_id=RUN_ID)
-    assert timed_out.ledger_records(RUN_ID)[0].status is AIStatus.TIMEOUT
+    timeout_record = timed_out.ledger_records(RUN_ID)[0]
+    assert timeout_record.status is AIStatus.FALLBACK_DETERMINISTIC
+    assert timeout_record.provider is ProviderName.DETERMINISTIC
+    assert timeout_record.error is not None and "fallback_reason=timeout" in timeout_record.error
 
     broken = live_runtime(FakeClient(_Response("not json at all")))
     broken.semantic_resolver(RUN_ID).resolve(request, run_id=RUN_ID)
     record = broken.ledger_records(RUN_ID)[0]
-    assert record.status is AIStatus.ERROR
+    assert record.status is AIStatus.FALLBACK_DETERMINISTIC
+    assert record.provider is ProviderName.DETERMINISTIC
+    assert record.error is not None and "fallback_reason=error" in record.error
     assert record.error is not None and "not JSON" in record.error
 
 
@@ -418,7 +425,7 @@ def test_redteam_cases_never_change_the_original_proposal() -> None:
         verdict = runtime.redteam(RUN_ID, request, original, case)
         assert verdict["original_proposal"] == original.model_dump(mode="json")
         if case == "TIMEOUT":
-            assert verdict["status"] == "timeout"
+            assert verdict["status"] == "fallback_deterministic"
             assert verdict["tampered_proposal"]["provider"] == "deterministic"
         else:
             assert verdict["grounding"]["valid"] is False

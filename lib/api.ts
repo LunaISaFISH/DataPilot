@@ -38,31 +38,161 @@ import type {
 // Base URL resolution
 // ---------------------------------------------------------------------------
 
-const configuredApiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || null;
+export const API_BASE_STORAGE_KEY = 'datapilot.apiBaseUrl';
+export const DEFAULT_API_BASE = 'http://localhost:8000';
 
-function isLocalBrowser(): boolean {
-  if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  return host === 'localhost' || host === '127.0.0.1';
+export type ApiBaseSource = 'query' | 'storage' | 'environment' | 'default';
+export type ApiBaseConfig = {
+  base: string;
+  source: ApiBaseSource;
+};
+
+/**
+ * Validate and normalize a user-supplied API origin/base path. URL credentials, query strings,
+ * and fragments are rejected so appending an endpoint path cannot change the request target.
+ */
+export function normalizeApiBase(value: string | null | undefined): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (url.username || url.password || url.search || url.hash) return null;
+    url.pathname = url.pathname.replace(/\/+$/, '');
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
 }
 
-/** `NEXT_PUBLIC_API_BASE_URL`, else `http://localhost:8000` on localhost, else null (replay only). */
-export function resolveApiBase(): string | null {
-  if (configuredApiBase) return configuredApiBase;
-  return isLocalBrowser() ? 'http://localhost:8000' : null;
+const configuredApiBase = normalizeApiBase(process.env.NEXT_PUBLIC_API_BASE_URL);
+const apiBaseListeners = new Set<() => void>();
+
+function queryApiBase(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return normalizeApiBase(new URLSearchParams(window.location.search).get('api'));
+  } catch {
+    return null;
+  }
 }
 
-function subscribeNoop() {
-  return () => undefined;
+function storedApiBase(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return normalizeApiBase(window.localStorage.getItem(API_BASE_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function resolveApiBaseConfig(): ApiBaseConfig {
+  const query = queryApiBase();
+  if (query) return { base: query, source: 'query' };
+  const stored = storedApiBase();
+  if (stored) return { base: stored, source: 'storage' };
+  if (configuredApiBase) return { base: configuredApiBase, source: 'environment' };
+  return { base: DEFAULT_API_BASE, source: 'default' };
+}
+
+/** `?api=` → local storage → build-time environment → localhost default. */
+export function resolveApiBase(): string {
+  return resolveApiBaseConfig().base;
+}
+
+function removeApiQueryParameter(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('api')) return;
+    url.searchParams.delete('api');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    // A locked-down embedding may deny history access; storage still remains safe to update.
+  }
+}
+
+function emitApiBaseChange(): void {
+  for (const listener of apiBaseListeners) listener();
+}
+
+/** Save a validated runtime override and make it active in this tab. */
+export function setApiBaseOverride(value: string): string | null {
+  const normalized = normalizeApiBase(value);
+  if (!normalized || typeof window === 'undefined') return null;
+  try {
+    window.localStorage.setItem(API_BASE_STORAGE_KEY, normalized);
+  } catch {
+    return null;
+  }
+  removeApiQueryParameter();
+  emitApiBaseChange();
+  return normalized;
+}
+
+/** Remove both URL and persisted runtime overrides, revealing environment/default config. */
+export function clearApiBaseOverride(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(API_BASE_STORAGE_KEY);
+  } catch {
+    // The query parameter can still be removed when storage is unavailable.
+  }
+  removeApiQueryParameter();
+  emitApiBaseChange();
+}
+
+function subscribeApiBase(listener: () => void): () => void {
+  apiBaseListeners.add(listener);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === API_BASE_STORAGE_KEY || event.key === null) listener();
+  };
+  const onLocationChange = () => listener();
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('popstate', onLocationChange);
+  }
+  return () => {
+    apiBaseListeners.delete(listener);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('popstate', onLocationChange);
+    }
+  };
+}
+
+function browserApiBaseSnapshot(): string {
+  return JSON.stringify(resolveApiBaseConfig());
+}
+
+function serverApiBaseSnapshot(): string {
+  return JSON.stringify({
+    base: configuredApiBase ?? DEFAULT_API_BASE,
+    source: configuredApiBase ? 'environment' : 'default',
+  } satisfies ApiBaseConfig);
+}
+
+/** Reactive API configuration. The server snapshot keeps initial hydration deterministic. */
+export function useApiBase(): ApiBaseConfig {
+  const snapshot = useSyncExternalStore(subscribeApiBase, browserApiBaseSnapshot, serverApiBaseSnapshot);
+  const config = useMemo(() => JSON.parse(snapshot) as ApiBaseConfig, [snapshot]);
+
+  useEffect(() => {
+    const query = queryApiBase();
+    if (!query) return;
+    try {
+      window.localStorage.setItem(API_BASE_STORAGE_KEY, query);
+    } catch {
+      // Runtime use still works from the URL when persistence is unavailable.
+    }
+  }, []);
+
+  return config;
 }
 
 /** True when a live API base can be resolved in this browser. Stable across SSR/hydration. */
 export function useLiveApiAvailable(): boolean {
-  return useSyncExternalStore(
-    subscribeNoop,
-    () => Boolean(configuredApiBase || isLocalBrowser()),
-    () => Boolean(configuredApiBase),
-  );
+  return Boolean(useApiBase().base);
 }
 
 // ---------------------------------------------------------------------------
@@ -681,12 +811,15 @@ export type HealthState = {
   error: ApiError | null;
   loading: boolean;
   checkedAt: number | null;
+  apiBase: string | null;
+  apiBaseSource: ApiBaseSource;
   refresh: () => void;
 };
 
 /** Polls `/health` every `intervalMs` (default 15 s). Never throws; errors are surfaced in state. */
 export function useHealth(intervalMs = 15_000): HealthState {
-  const available = useLiveApiAvailable();
+  const { base: apiBase, source: apiBaseSource } = useApiBase();
+  const available = Boolean(apiBase);
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(true);
@@ -698,10 +831,15 @@ export function useHealth(intervalMs = 15_000): HealthState {
   useEffect(() => {
     if (!available) return;
     let cancelled = false;
-    const run = async () => {
+    const run = async (reset = false) => {
       inflight.current?.abort();
       const controller = new AbortController();
       inflight.current = controller;
+      if (reset) {
+        setLoading(true);
+        setHealth(null);
+        setError(null);
+      }
       try {
         const info = await getHealth(controller.signal);
         if (cancelled) return;
@@ -718,18 +856,26 @@ export function useHealth(intervalMs = 15_000): HealthState {
         }
       }
     };
-    void run();
+    void run(true);
     const timer = setInterval(() => void run(), intervalMs);
     return () => {
       cancelled = true;
       clearInterval(timer);
       inflight.current?.abort();
     };
-  }, [available, intervalMs, tick]);
+  }, [apiBase, available, intervalMs, tick]);
 
   const refresh = () => setTick((n) => n + 1);
   if (!available) {
-    return { health: null, error: unavailable, loading: false, checkedAt: null, refresh };
+    return {
+      health: null,
+      error: unavailable,
+      loading: false,
+      checkedAt: null,
+      apiBase,
+      apiBaseSource,
+      refresh,
+    };
   }
-  return { health, error, loading, checkedAt, refresh };
+  return { health, error, loading, checkedAt, apiBase, apiBaseSource, refresh };
 }

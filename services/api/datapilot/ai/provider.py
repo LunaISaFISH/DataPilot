@@ -16,11 +16,14 @@ not supported"), so list bounds are enforced by the pydantic output models inste
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -38,6 +41,8 @@ SERVER_SIDE_FALLBACK_BETA = "server-side-fallback-2026-07-01"
 AI_MODES = ("auto", "off", "replay")
 CACHE_POLICIES = ("fallback", "prefer", "off")
 _ERROR_LIMIT = 240
+DAILY_CALL_CAP_EXCEEDED = "AI_DAILY_CALL_CAP_EXCEEDED"
+DAILY_CALL_BUDGET_UNAVAILABLE = "AI_DAILY_CALL_BUDGET_UNAVAILABLE"
 
 
 @dataclass(frozen=True)
@@ -184,6 +189,99 @@ class ResponseCache:
 
 
 # --------------------------------------------------------------------------------------
+# persistent public-runtime budget
+# --------------------------------------------------------------------------------------
+
+
+class PersistentDailyCallBudget:
+    """Process-safe UTC-day reservations for actual provider network calls.
+
+    A sidecar lock is used because the JSON state file is atomically replaced. Corrupt or
+    unreadable state fails closed: a public deployment must never reset spend merely because
+    its accounting file cannot be trusted.
+    """
+
+    def __init__(self, root: Path, cap: int) -> None:
+        self.root = Path(root)
+        self.cap = max(0, cap)
+        self._thread_lock = threading.RLock()
+
+    @staticmethod
+    def _day() -> str:
+        return datetime.now(UTC).date().isoformat()
+
+    def _state_path(self, day: str) -> Path:
+        return self.root / f"{day}.json"
+
+    def _lock_path(self, day: str) -> Path:
+        return self.root / f"{day}.lock"
+
+    def _read_used(self, day: str) -> int:
+        path = self._state_path(day)
+        if not path.is_file():
+            return 0
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict):
+            raise ValueError("daily budget state is not an object")
+        used = loaded.get("calls_used")
+        if loaded.get("date") != day or not isinstance(used, int) or isinstance(used, bool):
+            raise ValueError("daily budget state has invalid fields")
+        if used < 0:
+            raise ValueError("daily budget state has a negative call count")
+        return used
+
+    def reserve(self) -> tuple[bool, str | None]:
+        """Reserve one call before network dispatch, including calls that later fail."""
+        day = self._day()
+        try:
+            with self._thread_lock:
+                self.root.mkdir(parents=True, exist_ok=True)
+                with open(self._lock_path(day), "a+b") as lock_file:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                    used = self._read_used(day)
+                    if used >= self.cap:
+                        return False, DAILY_CALL_CAP_EXCEEDED
+                    atomic_write_json(
+                        self._state_path(day),
+                        {
+                            "date": day,
+                            "calls_used": used + 1,
+                            "daily_cap": self.cap,
+                            "updated_at": utc_now_iso(),
+                        },
+                    )
+        except (OSError, ValueError, json.JSONDecodeError):
+            return False, DAILY_CALL_BUDGET_UNAVAILABLE
+        return True, None
+
+    def status(self) -> dict[str, Any]:
+        day = self._day()
+        try:
+            with self._thread_lock:
+                self.root.mkdir(parents=True, exist_ok=True)
+                with open(self._lock_path(day), "a+b") as lock_file:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
+                    used = self._read_used(day)
+        except (OSError, ValueError, json.JSONDecodeError):
+            return {
+                "date": day,
+                "daily_cap": self.cap,
+                "calls_used": None,
+                "remaining": 0,
+                "exhausted": True,
+                "available": False,
+            }
+        return {
+            "date": day,
+            "daily_cap": self.cap,
+            "calls_used": used,
+            "remaining": max(0, self.cap - used),
+            "exhausted": used >= self.cap,
+            "available": True,
+        }
+
+
+# --------------------------------------------------------------------------------------
 # Anthropic
 # --------------------------------------------------------------------------------------
 
@@ -221,11 +319,13 @@ class AnthropicProvider:
         *,
         client: Any | None = None,
         cache: ResponseCache | None = None,
+        daily_budget: PersistentDailyCallBudget | None = None,
         use_server_side_fallback: bool = True,
     ) -> None:
         self._model = model or configured_model()
         self._client = client
         self.cache = cache
+        self.daily_budget = daily_budget
         self.use_server_side_fallback = use_server_side_fallback
 
     @property
@@ -299,6 +399,8 @@ class AnthropicProvider:
                     },
                 )
             return result
+        if result.error in (DAILY_CALL_CAP_EXCEEDED, DAILY_CALL_BUDGET_UNAVAILABLE):
+            return result
         if self.cache is not None:
             cached = self._from_cache(task, input_hash, live_error=result.error or result.status)
             if cached is not None:
@@ -360,6 +462,11 @@ class AnthropicProvider:
                 request_id=None,
                 error=_truncate_error(error),
             )
+
+        if self.daily_budget is not None:
+            allowed, reason = self.daily_budget.reserve()
+            if not allowed:
+                return failure(AIStatus.ERROR, reason or DAILY_CALL_BUDGET_UNAVAILABLE)
 
         try:
             response = self._client_for(timeout_s).beta.messages.create(**kwargs)
@@ -783,3 +890,22 @@ def select_provider(mode: str | None = None, model: str | None = None) -> LLMPro
         return DeterministicProvider(ProviderName.DETERMINISTIC)
     cache = ResponseCache(cache_root(), cache_policy())
     return AnthropicProvider(model or configured_model(), cache=cache)
+
+
+def configure_public_provider(
+    provider: LLMProvider, *, data_root: Path, daily_call_cap: int
+) -> PersistentDailyCallBudget | None:
+    """Attach public-mode persistence and prefer an existing response cache."""
+    if not isinstance(provider, AnthropicProvider):
+        return None
+    budget = PersistentDailyCallBudget(data_root / "public-runtime" / "ai-budget", daily_call_cap)
+    provider.daily_budget = budget
+    if provider.cache is not None and provider.cache.enabled:
+        provider.cache = ResponseCache(data_root / "ai-cache", "prefer")
+    return budget
+
+
+def daily_budget_status(provider: LLMProvider) -> dict[str, Any] | None:
+    if not isinstance(provider, AnthropicProvider) or provider.daily_budget is None:
+        return None
+    return provider.daily_budget.status()

@@ -61,6 +61,9 @@ function PermissionCard({ contract }: { contract: AiContract }) {
   const notProposable = labelKeys('allowed_action')
     .filter((action) => !contract.allowed_proposals.includes(action as (typeof contract.allowed_proposals)[number]))
     .map((action) => label('allowed_action', action, language));
+  const groundingReasons = TASKS.flatMap((task) =>
+    (contract.grounding_reason_codes[task] ?? []).map((reason) => ({ task, reason })),
+  );
 
   const checkVector = async () => {
     setVectorError(null);
@@ -129,13 +132,13 @@ function PermissionCard({ contract }: { contract: AiContract }) {
         ))}
         <details className="rounded-md border border-border">
           <summary className="cursor-pointer px-2 py-1 text-xs hover:bg-muted">
-            {t('Grounding reason codes', '落地校验原因码')} · {formatInt(contract.grounding_reason_codes.length)}
+            {t('Grounding reason codes', '落地校验原因码')} · {formatInt(groundingReasons.length)}
           </summary>
           <ul className="flex flex-col divide-y divide-border border-t border-border text-xs">
-            {contract.grounding_reason_codes.map((reason) => (
-              <li key={reason.code} className="flex items-baseline justify-between gap-2 px-2 py-1">
-                <span className="mono">{reason.code}</span>
-                <span className="text-right text-muted-foreground">{pick(language, reason.zh, reason.en) || label('grounding_reason', reason.code, language)}</span>
+            {groundingReasons.map(({ task, reason }) => (
+              <li key={`${task}-${reason.code}`} className="flex items-baseline justify-between gap-2 px-2 py-1">
+                <span className="mono">{label('ai_task', task, language)} · {reason.code}</span>
+                <span className="text-right text-muted-foreground">{pick(language, reason.gloss_zh, reason.gloss_en) || label('grounding_reason', reason.code, language)}</span>
               </li>
             ))}
           </ul>

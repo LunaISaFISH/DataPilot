@@ -71,6 +71,7 @@ META_FIELDS = (
 
 _RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 _ARTIFACT_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+_PROTECTED_ARTIFACTS = frozenset({META_FILE, SOURCE_FILE})
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -95,6 +96,15 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _json_ready(item) for key, item in value.items()}
     return value
+
+
+def _require_writable_artifact(name: str) -> None:
+    if name in _PROTECTED_ARTIFACTS:
+        raise StorageError(
+            "ARTIFACT_PROTECTED",
+            f"工件 `{name}` 只能通过专用存储操作修改。",
+            f"Artifact `{name}` can only be changed through its dedicated storage operation.",
+        )
 
 
 class RunStore:
@@ -244,6 +254,7 @@ class RunStore:
     def write_json(self, run_id: str, name: str, obj: Any) -> Path:
         target = self.path(run_id, name)
         self._require(run_id)
+        _require_writable_artifact(name)
         atomic_write_json(target, _json_ready(obj))
         return target
 
@@ -267,6 +278,7 @@ class RunStore:
     def write_bytes(self, run_id: str, name: str, payload: bytes) -> Path:
         target = self.path(run_id, name)
         self._require(run_id)
+        _require_writable_artifact(name)
         atomic_write_bytes(target, payload)
         return target
 

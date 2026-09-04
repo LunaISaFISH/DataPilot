@@ -694,7 +694,7 @@ export default function WorkbenchPage() {
       {!available ? (
         <InlineAlert
           variant="info"
-          title={t('Replay-only deployment', '当前为仅回放部署')}
+          title={t('Live API unavailable', '实时 API 暂不可用')}
           actions={
             <Button size="xs" variant="outline" nativeButton={false} render={<Link href="/demo/clinical-nlp" />}>
               {t('Open offline replay', '打开离线回放')}
@@ -702,8 +702,8 @@ export default function WorkbenchPage() {
           }
         >
           {t(
-            'Live analysis needs the local API (FastAPI on 127.0.0.1:8000, or NEXT_PUBLIC_API_BASE_URL). This published site can only show the recorded clinical replay.',
-            '实时分析需要本地 API（127.0.0.1:8000 上的 FastAPI，或配置 NEXT_PUBLIC_API_BASE_URL）。当前发布站点只能展示已录制的临床样例回放。',
+            'Live analysis needs a reachable v0.2 API. Check the Backend setting or the deployment configuration; the labelled offline replay remains available.',
+            '实时分析需要连接到 v0.2 API。请检查“后端连接”设置或部署配置；带明确标识的离线回放仍可使用。',
           )}
         </InlineAlert>
       ) : null}

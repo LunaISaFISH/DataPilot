@@ -7,13 +7,15 @@ reads the run directory, so a restarted process sees every run.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
 import threading
 import time
 import uuid
-from collections.abc import Awaitable, Callable, MutableMapping
+from collections.abc import AsyncIterator, Awaitable, Callable, MutableMapping
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,6 +27,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import Field
 
 from datapilot.ai import REDTEAM_CASES, AIRuntime, ai_contract_card, get_runtime
+from datapilot.ai.provider import configure_public_provider, daily_budget_status
 from datapilot.api.errors import (
     CORRELATION_HEADER,
     APIError,
@@ -89,6 +92,14 @@ from datapilot.governance import (
     verify_run,
 )
 from datapilot.pipeline import Pipeline, sync_pipeline_from_env
+from datapilot.public_runtime import (
+    MAINTENANCE_INTERVAL_SECONDS,
+    PublicRateLimitMiddleware,
+    PublicRequestLimits,
+    cleanup_expired_runs,
+    is_public_seed,
+    seed_public_samples,
+)
 from datapilot.samples import get_sample, list_samples, sample_contract_text
 from datapilot.serialization import atomic_write_json
 from datapilot.storage import (
@@ -168,6 +179,9 @@ REVISION_SCOPED_FILES = (
     BRIEF_FILE,
     IDEMPOTENCY_FILE,
 )
+APPLY_OUTPUT_FILES = frozenset(
+    {CANDIDATE_FILE, RELEASE_FILE, MANIFEST_FILE, CHANGES_FILE, EXECUTION_FILE}
+)
 
 
 # --------------------------------------------------------------------------------------
@@ -182,6 +196,19 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_nonnegative_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError as error:
+        raise ValueError(f"{name} must be a non-negative integer") from error
+    if value < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path
@@ -189,9 +216,27 @@ class Settings:
     sync_pipeline: bool = False
     api_token: str | None = None
     docs_enabled: bool = True
+    public_mode: bool = False
+    run_retention_hours: int = 24
+    seed_samples: bool = False
+    ai_daily_call_cap: int = 400
+    uploads_per_minute: int = 10
+    ai_requests_per_hour: int = 20
+
+    def __post_init__(self) -> None:
+        numeric = {
+            "run_retention_hours": self.run_retention_hours,
+            "ai_daily_call_cap": self.ai_daily_call_cap,
+            "uploads_per_minute": self.uploads_per_minute,
+            "ai_requests_per_hour": self.ai_requests_per_hour,
+        }
+        invalid = [name for name, value in numeric.items() if value < 0]
+        if invalid:
+            raise ValueError(f"Settings values must be non-negative: {', '.join(invalid)}")
 
     @classmethod
     def from_env(cls) -> Settings:
+        public_mode = _env_flag("DATAPILOT_PUBLIC_MODE", False)
         origins = tuple(
             origin.strip()
             for origin in os.environ.get(
@@ -206,6 +251,14 @@ class Settings:
             sync_pipeline=sync_pipeline_from_env(),
             api_token=token,
             docs_enabled=_env_flag("DATAPILOT_DOCS", True),
+            public_mode=public_mode,
+            run_retention_hours=_env_nonnegative_int("DATAPILOT_RUN_RETENTION_HOURS", 24),
+            seed_samples=_env_flag("DATAPILOT_SEED_SAMPLES", public_mode),
+            ai_daily_call_cap=_env_nonnegative_int("DATAPILOT_AI_DAILY_CALL_CAP", 400),
+            uploads_per_minute=_env_nonnegative_int("DATAPILOT_UPLOADS_PER_MINUTE", 10),
+            ai_requests_per_hour=_env_nonnegative_int(
+                "DATAPILOT_AI_REQUESTS_PER_HOUR", 20
+            ),
         )
 
 
@@ -410,6 +463,7 @@ def _error_detail(meta: dict[str, Any]) -> ErrorDetail | None:
 def _run_detail(ctx: AppContext, run_id: str) -> RunDetail:
     meta = _meta(ctx, run_id)
     store = ctx.store
+    lifecycle = _lifecycle(meta)
     report = store.read_model(run_id, REPORT_FILE, RunReport)
     contract: ContractView | None = None
     if report is not None or store.has(run_id, CONTRACT_FILE):
@@ -419,7 +473,7 @@ def _run_detail(ctx: AppContext, run_id: str) -> RunDetail:
             contract = None
     return RunDetail(
         run_id=run_id,
-        lifecycle=_lifecycle(meta),
+        lifecycle=lifecycle,
         source_name=str(meta.get("source_name") or ""),
         sample_id=meta.get("sample_id") if isinstance(meta.get("sample_id"), str) else None,
         created_at=str(meta.get("created_at") or ""),
@@ -429,7 +483,11 @@ def _run_detail(ctx: AppContext, run_id: str) -> RunDetail:
         decisions=_decisions(ctx, run_id),
         dry_run=store.read_model(run_id, DRY_RUN_FILE, DryRunReport),
         preview=store.read_model(run_id, PREVIEW_FILE, ChangePreview),
-        execution=store.read_model(run_id, EXECUTION_FILE, ExecutionResult),
+        execution=(
+            store.read_model(run_id, EXECUTION_FILE, ExecutionResult)
+            if lifecycle is Lifecycle.APPLIED
+            else None
+        ),
         brief=store.read_model(run_id, BRIEF_FILE, ReleaseBrief),
         error=_error_detail(meta),
     )
@@ -483,9 +541,14 @@ def _sha256_file(path: Path) -> str:
 
 def _artifact_listing(ctx: AppContext, run_id: str) -> list[dict[str, Any]]:
     directory = ctx.store.run_dir(run_id)
+    applied = _lifecycle(ctx.store.read_meta(run_id)) is Lifecycle.APPLIED
     items: list[dict[str, Any]] = []
     for path in sorted(directory.iterdir()):
-        if not path.is_file() or path.name.startswith("."):
+        if (
+            not path.is_file()
+            or path.name.startswith(".")
+            or (not applied and path.name in APPLY_OUTPUT_FILES)
+        ):
             continue
         stat = path.stat()
         items.append(
@@ -505,6 +568,7 @@ def _artifact_listing(ctx: AppContext, run_id: str) -> list[dict[str, Any]]:
 def _audit_bundle(ctx: AppContext, run_id: str) -> dict[str, Any]:
     meta = _meta(ctx, run_id)
     store = ctx.store
+    applied = _lifecycle(meta) is Lifecycle.APPLIED
 
     def optional(name: str) -> Any:
         return store.read_json(run_id, name) if store.has(run_id, name) else None
@@ -521,9 +585,9 @@ def _audit_bundle(ctx: AppContext, run_id: str) -> dict[str, Any]:
         },
         "decisions": optional(DECISIONS_FILE) or {},
         "dry_run": optional(DRY_RUN_FILE),
-        "execution": optional(EXECUTION_FILE),
+        "execution": optional(EXECUTION_FILE) if applied else None,
         "ai_ledger": [record.model_dump(mode="json") for record in store.read_ledger(run_id)],
-        "release_manifest": optional(MANIFEST_FILE),
+        "release_manifest": optional(MANIFEST_FILE) if applied else None,
     }
 
 
@@ -666,6 +730,58 @@ def _idempotency_record(ctx: AppContext, run_id: str) -> dict[str, Any] | None:
     return loaded if isinstance(loaded, dict) else None
 
 
+def _finalize_apply(
+    ctx: AppContext,
+    run_id: str,
+    key: str,
+    revision: int,
+    result: ExecutionResult,
+) -> None:
+    """Commit a computed execution and repair an interrupted finalization idempotently."""
+    previous = _idempotency_record(ctx, run_id) or {}
+    if previous.get("state") != "COMPLETED":
+        applied_at = previous.get("applied_at")
+        ctx.store.write_json(
+            run_id,
+            IDEMPOTENCY_FILE,
+            {
+                "key": key,
+                "state": "COMPLETED",
+                "started_at": previous.get("started_at"),
+                "applied_at": applied_at if isinstance(applied_at, str) else utc_now_iso(),
+                "run_revision": revision,
+                "approved_action_set_hash": result.dry_run.approved_action_set_hash,
+            },
+        )
+    meta = ctx.store.read_meta(run_id)
+    if _lifecycle(meta) is not Lifecycle.APPLIED:
+        ctx.store.update_meta(
+            run_id,
+            lifecycle=Lifecycle.APPLIED.value,
+            release_status=result.release_manifest.release_status.value,
+        )
+    release_hash = result.release_manifest.release_artifact_hash
+    already_recorded = any(
+        event.stage == "APPLIED"
+        and event.status is EventStatus.COMPLETED
+        and event.detail.get("release_artifact_hash") == release_hash
+        for event in ctx.store.read_events(run_id)
+    )
+    if not already_recorded:
+        ctx.store.append_event(
+            run_id,
+            "APPLIED",
+            EventStatus.COMPLETED,
+            f"发布已执行并验证：{result.release_manifest.release_status.value}",
+            f"Release executed and validated: {result.release_manifest.release_status.value}",
+            detail={
+                "release_status": result.release_manifest.release_status.value,
+                "validations": result.release_manifest.validation_summary,
+                "release_artifact_hash": release_hash,
+            },
+        )
+
+
 def _tamper(source: bytes) -> bytes:
     """Flip one byte of a copy of the source (a printable data byte, never the header)."""
     if not source:
@@ -742,8 +858,47 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     store = RunStore(settings.data_dir / "runs")
     ai = get_runtime(store)
+    if settings.public_mode:
+        configure_public_provider(
+            ai.provider,
+            data_root=settings.data_dir,
+            daily_call_cap=settings.ai_daily_call_cap,
+        )
     pipeline = Pipeline(store, ai, sync=settings.sync_pipeline)
     ctx = AppContext(settings=settings, store=store, ai=ai, pipeline=pipeline)
+
+    async def maintenance_loop() -> None:
+        while True:
+            await asyncio.sleep(MAINTENANCE_INTERVAL_SECONDS)
+            await asyncio.to_thread(
+                cleanup_expired_runs,
+                store,
+                pipeline,
+                settings.run_retention_hours,
+            )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        maintenance: asyncio.Task[None] | None = None
+        if settings.public_mode:
+            await asyncio.to_thread(
+                cleanup_expired_runs,
+                store,
+                pipeline,
+                settings.run_retention_hours,
+            )
+            if settings.seed_samples:
+                await asyncio.to_thread(seed_public_samples, store, pipeline)
+            maintenance = asyncio.create_task(
+                maintenance_loop(), name="datapilot-public-maintenance"
+            )
+        try:
+            yield
+        finally:
+            if maintenance is not None:
+                maintenance.cancel()
+                with suppress(asyncio.CancelledError):
+                    await maintenance
 
     app = FastAPI(
         title="DataPilot API",
@@ -753,6 +908,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs" if settings.docs_enabled else None,
         redoc_url=None,
         openapi_url="/openapi.json" if settings.docs_enabled else None,
+        lifespan=lifespan,
     )
     app.state.context = ctx
     app.add_middleware(
@@ -761,8 +917,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Idempotency-Key", "Authorization", "Last-Event-ID"],
-        expose_headers=[CORRELATION_HEADER, "Server-Timing", "X-Idempotent-Replay"],
+        expose_headers=[
+            CORRELATION_HEADER,
+            "Server-Timing",
+            "X-Idempotent-Replay",
+            "Retry-After",
+        ],
     )
+    if settings.public_mode:
+        app.add_middleware(
+            PublicRateLimitMiddleware,
+            limits=PublicRequestLimits(
+                settings.uploads_per_minute,
+                settings.ai_requests_per_hour,
+            ),
+        )
     app.add_middleware(RequestContextMiddleware, api_token=settings.api_token)
     install_error_handlers(app)
 
@@ -781,6 +950,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload["api_version"] = API_VERSION
         payload["data_dir_writable"] = writable
         payload["sync_pipeline"] = settings.sync_pipeline
+        payload["public_runtime"] = {
+            "enabled": settings.public_mode,
+            "run_retention_hours": settings.run_retention_hours,
+            "seed_samples": settings.seed_samples,
+            "limits": {
+                "uploads_per_minute": settings.uploads_per_minute,
+                "ai_requests_per_hour": settings.ai_requests_per_hour,
+            },
+            "ai_daily_budget": daily_budget_status(ai.provider),
+        }
         return payload
 
     @app.get("/v1/samples", response_model=list[SampleInfo])
@@ -883,6 +1062,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         cutoff = datetime.now(UTC).timestamp() - older_than_minutes * 60
         deleted = 0
         for summary in store.list_runs():
+            if settings.public_mode and is_public_seed(summary.run_id):
+                continue
             created = summary.created_at.replace("Z", "+00:00")
             try:
                 created_ts = datetime.fromisoformat(created).timestamp()
@@ -951,7 +1132,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "The run is still processing; the contract cannot be replaced now.",
                 retryable=True,
             )
-        if lifecycle is Lifecycle.APPLIED:
+        if lifecycle is Lifecycle.APPLIED or store.has(run_id, EXECUTION_FILE):
             raise APIError(
                 409,
                 "RUN_APPLIED",
@@ -1082,7 +1263,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """
         meta, report = _require_report(ctx, run_id)
         lifecycle = _lifecycle(meta)
-        if lifecycle is Lifecycle.APPLIED:
+        if lifecycle is Lifecycle.APPLIED or store.has(run_id, EXECUTION_FILE):
             raise APIError(
                 409,
                 "RUN_APPLIED",
@@ -1117,6 +1298,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store.write_json(run_id, REPORT_FILE, fresh)
         store.remove(run_id, DRY_RUN_FILE)
         store.remove(run_id, PREVIEW_FILE)
+        store.remove(run_id, IDEMPOTENCY_FILE)
         present = {f.finding_id for f in fresh.findings}
         decisions = {k: v for k, v in _decisions(ctx, run_id).items() if k in present}
         store.write_json(run_id, DECISIONS_FILE, decisions)
@@ -1158,7 +1340,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.put("/v1/runs/{run_id}/decisions")
     def put_decisions(run_id: str, body: DecisionsRequest) -> dict[str, Any]:
         meta, report = _require_report(ctx, run_id)
-        if _lifecycle(meta) is Lifecycle.APPLIED:
+        if _lifecycle(meta) is Lifecycle.APPLIED or store.has(run_id, EXECUTION_FILE):
             raise APIError(
                 409,
                 "RUN_APPLIED",
@@ -1198,6 +1380,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store.write_json(run_id, DECISIONS_FILE, decisions)
         store.remove(run_id, DRY_RUN_FILE)
         store.remove(run_id, PREVIEW_FILE)
+        store.remove(run_id, IDEMPOTENCY_FILE)
         if _lifecycle(meta) is Lifecycle.DRY_RUN_READY:
             store.update_meta(run_id, lifecycle=Lifecycle.REVIEW_REQUIRED.value)
         unresolved = unresolved_findings(report, decisions)
@@ -1211,7 +1394,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def create_dry_run(run_id: str) -> dict[str, Any]:
         meta, report = _require_report(ctx, run_id)
         lifecycle = _lifecycle(meta)
-        if lifecycle is Lifecycle.APPLIED:
+        if lifecycle is Lifecycle.APPLIED or store.has(run_id, EXECUTION_FILE):
             raise APIError(
                 409, "RUN_APPLIED", "该运行已执行发布。", "The run has already been applied."
             )
@@ -1237,6 +1420,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         revision = int(meta.get("run_revision") or 1)
         dry_run = prepare_dry_run(report, list(decisions.values()), contract, run_revision=revision)
         preview = preview_changes(store.read_source(run_id), report, dry_run, 50, contract=contract)
+        store.remove(run_id, IDEMPOTENCY_FILE)
         store.write_json(run_id, DRY_RUN_FILE, dry_run)
         store.write_json(run_id, PREVIEW_FILE, preview)
         store.update_meta(run_id, lifecycle=Lifecycle.DRY_RUN_READY.value)
@@ -1264,9 +1448,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with ctx.apply_lock(run_id):
             meta, report = _require_report(ctx, run_id)
             existing = store.read_model(run_id, EXECUTION_FILE, ExecutionResult)
+            record = _idempotency_record(ctx, run_id)
             if existing is not None:
-                record = _idempotency_record(ctx, run_id) or {}
-                if record.get("key") == key:
+                if record is not None and record.get("key") == key:
+                    _finalize_apply(ctx, run_id, key, existing.dry_run.run_revision, existing)
                     response.headers["X-Idempotent-Replay"] = "true"
                     return existing
                 raise APIError(
@@ -1274,6 +1459,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "RUN_APPLIED",
                     "该运行已用另一个幂等键执行过发布。",
                     "The run was already applied with a different idempotency key.",
+                    observed=key,
+                    expected=record.get("key") if record is not None else None,
+                )
+            if record is not None and record.get("key") != key:
+                raise APIError(
+                    409,
+                    "RUN_APPLIED",
+                    "另一幂等键已有未完成的发布操作。",
+                    "Another idempotency key already owns an unfinished apply operation.",
                     observed=key,
                     expected=record.get("key"),
                 )
@@ -1326,33 +1520,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     expected=[],
                     extra={"execution": result.model_dump(mode="json")},
                 )
+            started_at = record.get("started_at") if record is not None else None
+            store.write_json(
+                run_id,
+                IDEMPOTENCY_FILE,
+                {
+                    "key": key,
+                    "state": "PENDING",
+                    "started_at": started_at if isinstance(started_at, str) else utc_now_iso(),
+                    "applied_at": None,
+                    "run_revision": revision,
+                    "approved_action_set_hash": dry_run.approved_action_set_hash,
+                },
+            )
             store.write_bytes(run_id, CANDIDATE_FILE, bundle.candidate_csv)
             store.write_bytes(run_id, RELEASE_FILE, bundle.release_csv)
             store.write_bytes(run_id, CHANGES_FILE, bundle.changes_jsonl)
             store.write_json(run_id, MANIFEST_FILE, result.release_manifest)
             store.write_json(run_id, EXECUTION_FILE, result)
-            store.write_json(
-                run_id,
-                IDEMPOTENCY_FILE,
-                {"key": key, "applied_at": utc_now_iso(), "run_revision": revision},
-            )
-            store.update_meta(
-                run_id,
-                lifecycle=Lifecycle.APPLIED.value,
-                release_status=result.release_manifest.release_status.value,
-            )
-            store.append_event(
-                run_id,
-                "APPLIED",
-                EventStatus.COMPLETED,
-                f"发布已执行并验证：{result.release_manifest.release_status.value}",
-                f"Release executed and validated: {result.release_manifest.release_status.value}",
-                detail={
-                    "release_status": result.release_manifest.release_status.value,
-                    "validations": result.release_manifest.validation_summary,
-                    "release_artifact_hash": result.release_manifest.release_artifact_hash,
-                },
-            )
+            _finalize_apply(ctx, run_id, key, revision, result)
             return result
 
     @app.post("/v1/runs/{run_id}/tamper-test")
@@ -1406,7 +1592,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/v1/runs/{run_id}/brief", response_model=ReleaseBrief)
     def get_brief(run_id: str) -> ReleaseBrief:
-        _require_report(ctx, run_id)
+        meta, _report = _require_report(ctx, run_id)
         brief = store.read_model(run_id, BRIEF_FILE, ReleaseBrief)
         if brief is not None and brief.status != "pending":
             return brief
@@ -1421,7 +1607,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         if pipeline.is_job_active(run_id, "brief"):
             return pending
-        if not store.has(run_id, EXECUTION_FILE):
+        if _lifecycle(meta) is not Lifecycle.APPLIED or not store.has(run_id, EXECUTION_FILE):
             raise APIError(
                 409,
                 "EXECUTION_MISSING",
@@ -1450,7 +1636,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/v1/runs/{run_id}/artifacts/{name}")
     def download_artifact(run_id: str, name: str) -> Response:
-        _meta(ctx, run_id)
+        meta = _meta(ctx, run_id)
+        if name in APPLY_OUTPUT_FILES and _lifecycle(meta) is not Lifecycle.APPLIED:
+            raise APIError(
+                409,
+                "APPLY_INCOMPLETE",
+                "发布尚未完成；执行工件仍在恢复中。",
+                "Apply has not completed; execution artifacts are still being recovered.",
+                retryable=True,
+            )
         if name == AUDIT_BUNDLE:
             bundle = _audit_bundle(ctx, run_id)
             return Response(

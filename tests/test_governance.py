@@ -13,8 +13,9 @@ from datapilot.contracts.models import (
     NormalizeCategoryAction,
     ReleaseStatus,
 )
-from datapilot.contracts.policy import contract_to_yaml
+from datapilot.contracts.policy import contract_to_yaml, parse_contract
 from datapilot.engine import analyze_csv
+from datapilot.engine.profile import overall_score
 from datapilot.governance import (
     GovernanceError,
     action_set_hash,
@@ -385,6 +386,65 @@ def test_preview_changes_is_bounded_and_totalled() -> None:
     full = preview_changes(source, report, dry_run, 1_000)
     assert len(full.changes) == 316 and full.truncated is False
     assert full.changes[0].display_key == "0"  # ordinal without a contract
+
+
+def test_sensitive_composite_business_key_is_masked_in_preview_and_ledger() -> None:
+    source = (
+        b"email,phone,id_card,tenant,city\n"
+        b"alice@example.com,13800138000,00000019900101000X,tenant-a,SH\n"
+    )
+    contract = parse_contract(
+        """id: sensitive-business-key
+version: 1.0.0
+business_key: [email, phone, id_card, tenant]
+fields:
+  email: {sensitive: true}
+  phone: {sensitive: true}
+  id_card: {sensitive: true}
+  city:
+    canonical:
+      上海: [SH]
+auto_authorization:
+  category_normalization: true
+"""
+    )
+    report = analyze_csv(source, contract)
+    dry_run = prepare_dry_run(report, demo_decisions(report), contract)
+
+    preview = preview_changes(source, report, dry_run, contract=contract)
+    expected_key = "••••@••••|1••••••••••|••••••••••••••••••|tenant-a"
+    assert [change.display_key for change in preview.changes] == [expected_key]
+    assert preview.changes[0].column == "city"
+
+    bundle = execute(source, contract, report, dry_run)
+    ledger = [json.loads(line) for line in bundle.changes_jsonl.decode().splitlines()]
+    assert {entry["display_key"] for entry in ledger} == {expected_key}
+    serialized = preview.model_dump_json() + bundle.changes_jsonl.decode()
+    for raw_value in ("alice@example.com", "13800138000", "00000019900101000X"):
+        assert raw_value not in serialized
+
+
+def test_candidate_overall_score_is_recomputed_after_fixed_uniqueness() -> None:
+    source = "city\nSH\n上海\n".encode()
+    contract = parse_contract(
+        """id: candidate-score
+version: 1.0.0
+fields:
+  city:
+    canonical:
+      上海: [SH]
+auto_authorization:
+  category_normalization: true
+"""
+    )
+    report = analyze_csv(source, contract)
+    dry_run = prepare_dry_run(report, [], contract)
+
+    bundle = execute(source, contract, report, dry_run)
+    candidate = bundle.result.candidate_profile
+    uniqueness = next(metric for metric in candidate.metrics if metric.name == "uniqueness")
+    assert uniqueness.score == 100.0
+    assert candidate.overall_score == overall_score(candidate.metrics, contract) == 100.0
 
 
 def test_verify_run_recomputes_every_hash(tmp_path: Path) -> None:
