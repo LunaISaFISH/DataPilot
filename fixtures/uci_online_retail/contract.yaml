@@ -1,0 +1,72 @@
+id: uci-online-retail
+version: 1.0.0
+title_zh: UCI 在线零售交易发布契约（真实公开数据）
+title_en: UCI Online Retail release contract (real public data)
+
+score:
+  version: dq-1.0
+  weights: { completeness: 0.30, validity: 0.25, consistency: 0.25, uniqueness: 0.20 }
+
+fields:
+  InvoiceNo:
+    required: true
+    pattern: "^C?\\d{6}$"
+  StockCode:
+    required: true
+  Quantity:
+    type: integer
+    min: 1
+  InvoiceDate:
+    type: datetime
+    format: "%Y-%m-%d %H:%M"
+    accept_formats: ["%m/%d/%Y %H:%M"]
+  UnitPrice:
+    type: number
+    min: 0.01
+  CustomerID:
+    required: true
+  Country:
+    allowed:
+      - United Kingdom
+      - Germany
+      - France
+      - Ireland
+      - Norway
+      - Portugal
+      - Belgium
+      - Cyprus
+      - Spain
+      - Netherlands
+      - Japan
+      - Switzerland
+      - Italy
+      - Australia
+      - Lithuania
+      - Iceland
+      - Sweden
+      - Denmark
+      - Finland
+      - Austria
+      - Poland
+      - Israel
+      - Bahrain
+      - Greece
+      - Singapore
+      - Lebanon
+      - United Arab Emirates
+      - Saudi Arabia
+      - Czech Republic
+      - Canada
+      - Brazil
+      - United States
+      - South Africa
+      - Malta
+    semantic: true
+
+ambiguity_registry:
+  Country: [Unspecified, European Community, Channel Islands]
+
+auto_authorization:
+  exact_duplicate_exclusion: true
+  category_normalization: true
+  date_standardization: true

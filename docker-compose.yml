@@ -6,6 +6,15 @@ services:
     environment:
       DATAPILOT_ALLOWED_ORIGINS: http://localhost:3000
       DATAPILOT_DATA_DIR: /var/lib/datapilot
+      # AI configuration is passed through from the host shell; nothing is baked into the image.
+      DATAPILOT_AI_MODE: ${DATAPILOT_AI_MODE:-auto}
+      DATAPILOT_AI_CACHE: ${DATAPILOT_AI_CACHE:-fallback}
+      DATAPILOT_DOCS: ${DATAPILOT_DOCS:-0}
+      DATAPILOT_API_TOKEN: ${DATAPILOT_API_TOKEN:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
     ports:
       - "8000:8000"
     volumes:

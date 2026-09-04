@@ -1,0 +1,68 @@
+id: clinical-nlp
+version: 1.2.0
+title_zh: 临床 NLP 发布契约
+title_en: Clinical NLP release contract
+
+score:
+  version: dq-1.0
+  weights:
+    completeness: 0.30
+    validity: 0.25
+    consistency: 0.25
+    uniqueness: 0.20
+
+business_key:
+  - record_id
+
+fields:
+  record_id:
+    unique: true
+  diagnosis_code:
+    required: true
+  diagnosis_label:
+    canonical:
+      Hypertension:
+        - HTN
+        - hypertension
+        - HYPERTENSION
+        - "Hypertension "
+    allowed:
+      - Hypertension
+      - Type 2 diabetes
+    semantic: true
+    consistent_with:
+      column: diagnosis_code
+      expected:
+        Hypertension:
+          - I10
+  region:
+    canonical:
+      North:
+        - north
+        - NORTH
+        - Northern
+    allowed:
+      - North
+      - South
+      - East
+      - West
+    semantic: true
+  encounter_date:
+    type: date
+    format: "%Y-%m-%d"
+    accept_formats:
+      - "%d/%m/%Y"
+  free_text_note:
+    sensitive: true
+
+ambiguity_registry:
+  diagnosis_label:
+    - MS
+    - RA
+    - CVA
+    - PCP
+
+auto_authorization:
+  exact_duplicate_exclusion: true
+  category_normalization: true
+  date_standardization: true

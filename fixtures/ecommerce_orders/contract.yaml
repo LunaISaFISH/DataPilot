@@ -1,0 +1,93 @@
+id: ecommerce-orders
+version: 1.0.0
+title_zh: 电商订单发布契约
+title_en: E-commerce orders release contract
+
+score:
+  version: dq-1.0
+  weights:
+    completeness: 0.30
+    validity: 0.25
+    consistency: 0.25
+    uniqueness: 0.20
+
+business_key:
+  - order_id
+
+fields:
+  order_id:
+    required: true
+    unique: true
+  customer_phone:
+    sensitive: true
+  city:
+    canonical:
+      上海:
+        - 上海市
+        - Shanghai
+        - shanghai
+        - SH
+      北京:
+        - 北京市
+        - Beijing
+        - BJ
+    allowed:
+      - 上海
+      - 北京
+      - 深圳
+      - 苏州
+      - 杭州
+      - 广州
+      - 成都
+      - 武汉
+    semantic: true
+  order_date:
+    type: date
+    format: "%Y-%m-%d"
+    accept_formats:
+      - "%d/%m/%Y"
+      - "%Y/%m/%d"
+  ship_date:
+    type: date
+    format: "%Y-%m-%d"
+  status:
+    required: true
+    canonical:
+      paid:
+        - 已支付
+        - PAID
+        - "paid "
+    allowed:
+      - paid
+      - shipped
+      - refunded
+      - cancelled
+  payment_method:
+    allowed:
+      - alipay
+      - wechat
+      - card
+      - cod
+  amount:
+    type: number
+    min: 0
+  currency:
+    allowed:
+      - CNY
+  channel:
+    allowed:
+      - app
+      - web
+      - mini_program
+      - offline
+  remark:
+    sensitive: true
+
+ambiguity_registry:
+  city:
+    - SZ
+
+auto_authorization:
+  exact_duplicate_exclusion: true
+  category_normalization: true
+  date_standardization: true

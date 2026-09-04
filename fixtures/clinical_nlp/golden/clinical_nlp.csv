@@ -354,26 +354,26 @@ REC-00352,SYN-12987,65+,F,West,2026-01-01,Type 2 diabetes,,PROC-03,Hospital,en,S
 REC-00353,SYN-13024,18-34,M,North,2026-02-02,Type 2 diabetes,E11.9,PROC-04,Clinic,zh,SYN-A,accepted,1,0.79,Synthetic patient email: demo.patient@example.test,BATCH-00,2026-09-02T08:00:00Z
 REC-00354,SYN-13061,35-49,Unknown,South,2026-03-03,Type 2 diabetes,E11.9,PROC-05,Telehealth,ms,SYN-B,accepted,2,0.80,Synthetic callback phone: +1 202 555 0182,BATCH-01,2026-09-03T08:00:00Z
 REC-00355,SYN-13098,50-64,F,East,2026-04-04,Type 2 diabetes,E11.9,PROC-06,Hospital,en,SYN-A,accepted,1,0.81,Synthetic direct identifier: Name: Example Person,BATCH-02,2026-09-01T08:00:00Z
-REC-00356,SYN-13135,65+,M,West,2026-05-05,Type 2 diabetes,E11.9,PROC-07,Clinic,zh,SYN-B,accepted,2,0.82,Synthetic note with no direct identifier.,BATCH-03,2026-09-02T08:00:00Z
-REC-00357,SYN-13172,18-34,Unknown,North,2026-06-06,Type 2 diabetes,E11.9,PROC-08,Telehealth,ms,SYN-A,accepted,1,0.83,Synthetic note with no direct identifier.,BATCH-04,2026-09-03T08:00:00Z
-REC-00358,SYN-13209,35-49,F,South,2026-07-07,Type 2 diabetes,E11.9,PROC-09,Hospital,en,SYN-B,accepted,2,0.84,Synthetic note with no direct identifier.,BATCH-05,2026-09-01T08:00:00Z
-REC-00359,SYN-13246,50-64,M,East,2026-08-08,Type 2 diabetes,E11.9,PROC-10,Clinic,zh,SYN-A,accepted,1,0.85,Synthetic note with no direct identifier.,BATCH-06,2026-09-02T08:00:00Z
-REC-00360,SYN-13283,65+,Unknown,West,2026-09-09,Type 2 diabetes,E11.9,PROC-11,Telehealth,ms,SYN-B,accepted,2,0.86,Synthetic note with no direct identifier.,BATCH-07,2026-09-03T08:00:00Z
-REC-00361,SYN-13320,18-34,F,North,2026-01-10,Type 2 diabetes,E11.9,PROC-00,Hospital,en,SYN-A,accepted,1,0.87,Synthetic note with no direct identifier.,BATCH-00,2026-09-01T08:00:00Z
-REC-00362,SYN-13357,35-49,M,South,2026-02-11,Type 2 diabetes,E11.9,PROC-01,Clinic,zh,SYN-B,accepted,2,0.88,Synthetic note with no direct identifier.,BATCH-01,2026-09-02T08:00:00Z
-REC-00363,SYN-13394,50-64,Unknown,East,2026-03-12,Type 2 diabetes,E11.9,PROC-02,Telehealth,ms,SYN-A,accepted,1,0.89,Synthetic note with no direct identifier.,BATCH-02,2026-09-03T08:00:00Z
-REC-00364,SYN-13431,65+,F,West,2026-04-13,Type 2 diabetes,E11.9,PROC-03,Hospital,en,SYN-B,accepted,2,0.90,Synthetic note with no direct identifier.,BATCH-03,2026-09-01T08:00:00Z
-REC-00365,SYN-13468,18-34,M,North,2026-05-14,Type 2 diabetes,E11.9,PROC-04,Clinic,zh,SYN-A,accepted,1,0.91,Synthetic note with no direct identifier.,BATCH-04,2026-09-02T08:00:00Z
-REC-00366,SYN-13505,35-49,Unknown,South,2026-06-15,Type 2 diabetes,E11.9,PROC-05,Telehealth,ms,SYN-B,accepted,2,0.92,Synthetic note with no direct identifier.,BATCH-05,2026-09-03T08:00:00Z
-REC-00367,SYN-13542,50-64,F,East,2026-07-16,Type 2 diabetes,E11.9,PROC-06,Hospital,en,SYN-A,accepted,1,0.93,Synthetic note with no direct identifier.,BATCH-06,2026-09-01T08:00:00Z
-REC-00368,SYN-13579,65+,M,West,2026-08-17,Type 2 diabetes,E11.9,PROC-07,Clinic,zh,SYN-B,accepted,2,0.94,Synthetic note with no direct identifier.,BATCH-07,2026-09-02T08:00:00Z
-REC-00369,SYN-13616,18-34,Unknown,North,2026-09-18,Type 2 diabetes,E11.9,PROC-08,Telehealth,ms,SYN-A,accepted,1,0.72,Synthetic note with no direct identifier.,BATCH-00,2026-09-03T08:00:00Z
-REC-00370,SYN-13653,35-49,F,South,2026-01-19,Type 2 diabetes,E11.9,PROC-09,Hospital,en,SYN-B,accepted,2,0.73,Synthetic note with no direct identifier.,BATCH-01,2026-09-01T08:00:00Z
-REC-00371,SYN-13690,50-64,M,East,2026-02-20,Type 2 diabetes,E11.9,PROC-10,Clinic,zh,SYN-A,accepted,1,0.74,Synthetic note with no direct identifier.,BATCH-02,2026-09-02T08:00:00Z
-REC-00372,SYN-13727,65+,Unknown,West,2026-03-21,Type 2 diabetes,E11.9,PROC-11,Telehealth,ms,SYN-B,accepted,2,0.75,Synthetic note with no direct identifier.,BATCH-03,2026-09-03T08:00:00Z
-REC-00373,SYN-13764,18-34,F,North,2026-04-22,Type 2 diabetes,E11.9,PROC-00,Hospital,en,SYN-A,accepted,1,0.76,Synthetic note with no direct identifier.,BATCH-04,2026-09-01T08:00:00Z
-REC-00374,SYN-13801,35-49,M,South,2026-05-23,Type 2 diabetes,E11.9,PROC-01,Clinic,zh,SYN-B,accepted,2,0.77,Synthetic note with no direct identifier.,BATCH-05,2026-09-02T08:00:00Z
-REC-00375,SYN-13838,50-64,Unknown,East,2026-06-24,Type 2 diabetes,E11.9,PROC-02,Telehealth,ms,SYN-A,accepted,1,0.78,Synthetic note with no direct identifier.,BATCH-06,2026-09-03T08:00:00Z
+REC-00356,SYN-13135,65+,M,West,2026-05-05,high blood pressure,I10,PROC-07,Clinic,zh,SYN-B,accepted,2,0.82,Synthetic note with no direct identifier.,BATCH-03,2026-09-02T08:00:00Z
+REC-00357,SYN-13172,18-34,Unknown,North,2026-06-06,high blood pressure,I10,PROC-08,Telehealth,ms,SYN-A,accepted,1,0.83,Synthetic note with no direct identifier.,BATCH-04,2026-09-03T08:00:00Z
+REC-00358,SYN-13209,35-49,F,South,2026-07-07,high blood pressure,I10,PROC-09,Hospital,en,SYN-B,accepted,2,0.84,Synthetic note with no direct identifier.,BATCH-05,2026-09-01T08:00:00Z
+REC-00359,SYN-13246,50-64,M,East,2026-08-08,high blood pressure,I10,PROC-10,Clinic,zh,SYN-A,accepted,1,0.85,Synthetic note with no direct identifier.,BATCH-06,2026-09-02T08:00:00Z
+REC-00360,SYN-13283,65+,Unknown,West,2026-09-09,high blood pressure,I10,PROC-11,Telehealth,ms,SYN-B,accepted,2,0.86,Synthetic note with no direct identifier.,BATCH-07,2026-09-03T08:00:00Z
+REC-00361,SYN-13320,18-34,F,North,2026-01-10,high blood pressure,I10,PROC-00,Hospital,en,SYN-A,accepted,1,0.87,Synthetic note with no direct identifier.,BATCH-00,2026-09-01T08:00:00Z
+REC-00362,SYN-13357,35-49,M,South,2026-02-11,high blood pressure,I10,PROC-01,Clinic,zh,SYN-B,accepted,2,0.88,Synthetic note with no direct identifier.,BATCH-01,2026-09-02T08:00:00Z
+REC-00363,SYN-13394,50-64,Unknown,East,2026-03-12,high blood pressure,I10,PROC-02,Telehealth,ms,SYN-A,accepted,1,0.89,Synthetic note with no direct identifier.,BATCH-02,2026-09-03T08:00:00Z
+REC-00364,SYN-13431,65+,F,West,2026-04-13,high blood pressure,I10,PROC-03,Hospital,en,SYN-B,accepted,2,0.90,Synthetic note with no direct identifier.,BATCH-03,2026-09-01T08:00:00Z
+REC-00365,SYN-13468,18-34,M,North,2026-05-14,HTN (essential),I10,PROC-04,Clinic,zh,SYN-A,accepted,1,0.91,Synthetic note with no direct identifier.,BATCH-04,2026-09-02T08:00:00Z
+REC-00366,SYN-13505,35-49,Unknown,South,2026-06-15,HTN (essential),I10,PROC-05,Telehealth,ms,SYN-B,accepted,2,0.92,Synthetic note with no direct identifier.,BATCH-05,2026-09-03T08:00:00Z
+REC-00367,SYN-13542,50-64,F,East,2026-07-16,HTN (essential),I10,PROC-06,Hospital,en,SYN-A,accepted,1,0.93,Synthetic note with no direct identifier.,BATCH-06,2026-09-01T08:00:00Z
+REC-00368,SYN-13579,65+,M,West,2026-08-17,HTN (essential),I10,PROC-07,Clinic,zh,SYN-B,accepted,2,0.94,Synthetic note with no direct identifier.,BATCH-07,2026-09-02T08:00:00Z
+REC-00369,SYN-13616,18-34,Unknown,North,2026-09-18,HTN (essential),I10,PROC-08,Telehealth,ms,SYN-A,accepted,1,0.72,Synthetic note with no direct identifier.,BATCH-00,2026-09-03T08:00:00Z
+REC-00370,SYN-13653,35-49,F,South,2026-01-19,HTN (essential),I10,PROC-09,Hospital,en,SYN-B,accepted,2,0.73,Synthetic note with no direct identifier.,BATCH-01,2026-09-01T08:00:00Z
+REC-00371,SYN-13690,50-64,M,East,2026-02-20,高血压,I10,PROC-10,Clinic,zh,SYN-A,accepted,1,0.74,Synthetic note with no direct identifier.,BATCH-02,2026-09-02T08:00:00Z
+REC-00372,SYN-13727,65+,Unknown,West,2026-03-21,高血压,I10,PROC-11,Telehealth,ms,SYN-B,accepted,2,0.75,Synthetic note with no direct identifier.,BATCH-03,2026-09-03T08:00:00Z
+REC-00373,SYN-13764,18-34,F,North,2026-04-22,高血压,I10,PROC-00,Hospital,en,SYN-A,accepted,1,0.76,Synthetic note with no direct identifier.,BATCH-04,2026-09-01T08:00:00Z
+REC-00374,SYN-13801,35-49,M,South,2026-05-23,高血压,I10,PROC-01,Clinic,zh,SYN-B,accepted,2,0.77,Synthetic note with no direct identifier.,BATCH-05,2026-09-02T08:00:00Z
+REC-00375,SYN-13838,50-64,Unknown,East,2026-06-24,高血压,I10,PROC-02,Telehealth,ms,SYN-A,accepted,1,0.78,Synthetic note with no direct identifier.,BATCH-06,2026-09-03T08:00:00Z
 REC-00376,SYN-13875,65+,F,West,2026-07-25,Type 2 diabetes,E11.9,PROC-03,Hospital,en,SYN-B,accepted,2,0.79,Synthetic note with no direct identifier.,BATCH-07,2026-09-01T08:00:00Z
 REC-00377,SYN-13912,18-34,M,North,2026-08-26,Type 2 diabetes,E11.9,PROC-04,Clinic,zh,SYN-A,accepted,1,0.80,Synthetic note with no direct identifier.,BATCH-00,2026-09-02T08:00:00Z
 REC-00378,SYN-13949,35-49,Unknown,South,2026-09-27,Type 2 diabetes,E11.9,PROC-05,Telehealth,ms,SYN-B,accepted,2,0.81,Synthetic note with no direct identifier.,BATCH-01,2026-09-03T08:00:00Z

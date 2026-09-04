@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Explainable dataset release gate core and API"
 requires-python = ">=3.12"
 dependencies = [
+  "anthropic>=1.3,<2",
   "fastapi>=0.116,<1",
   "polars>=1.32,<2",
   "pydantic>=2.11,<3",

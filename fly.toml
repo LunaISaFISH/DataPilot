@@ -1,0 +1,51 @@
+# Fly.io configuration for the DataPilot API (FastAPI + Polars).
+# Deploy with: flyctl deploy --config fly.toml --dockerfile Dockerfile.api
+# Secrets (never in this file): flyctl secrets set ANTHROPIC_API_KEY=...
+
+app = "datapilotgo-api"
+primary_region = "nrt"   # Tokyo: Anthropic API reachable; acceptable latency from China. Alternative: "sin".
+
+[build]
+  dockerfile = "Dockerfile.api"
+
+[env]
+  DATAPILOT_DATA_DIR = "/data"
+  DATAPILOT_ALLOWED_ORIGINS = "https://datapilotgo.com,https://www.datapilotgo.com,http://localhost:3000,http://127.0.0.1:3000"
+  DATAPILOT_AI_MODE = "auto"
+  DATAPILOT_AI_CACHE = "fallback"
+  ANTHROPIC_MODEL = "claude-opus-5"
+  DATAPILOT_DOCS = "0"
+  DATAPILOT_PUBLIC_MODE = "1"
+  DATAPILOT_SEED_SAMPLES = "1"
+  DATAPILOT_RUN_RETENTION_HOURS = "24"
+  DATAPILOT_AI_DAILY_CALL_CAP = "400"
+  PYTHONUNBUFFERED = "1"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"     # no cold starts during the fair
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 40
+    hard_limit = 80
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/health"
+
+[[mounts]]
+  source = "datapilot_data"
+  destination = "/data"
+  initial_size = "3gb"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"

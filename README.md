@@ -1,7 +1,10 @@
 # DataPilot
 
-DataPilot is an explainable release gate for tabular datasets. It separates deterministic
-observations, policy decisions, human review, deterministic execution, and validation.
+DataPilot is an explainable release gate for tabular datasets: **AI proposes · policy decides ·
+humans decide high-risk · deterministic rules execute · validations gate release.** It profiles
+any UTF-8/GB18030 CSV, checks it against a Data Contract (契约), lets the model propose bounded
+semantic mappings that a grounding validator must accept, records every AI call in a per-run
+ledger, and only publishes a release artifact after every validation passes.
 
 ## Local development
 
@@ -11,47 +14,81 @@ Requirements: Node.js 22+, Python 3.12+.
 npm install
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
-.venv/bin/uvicorn datapilot.api.main:app --reload --port 8000
-npm run dev
+cp .env.example .env            # optional; every variable has a working default
+
+make api                        # FastAPI on http://127.0.0.1:8000 with --reload and /docs
+make web                        # vinext dev server on http://127.0.0.1:3000
 ```
 
-Run the minimum verification gate:
+`make demo` starts both processes in booth mode (API bound to loopback, no reload, `/docs`
+disabled) and prints the AI provider and model it detected. `make demo-reset` wipes every run
+and seeds the three sample runs plus one observational run against the running API.
+`make golden` regenerates `fixtures/clinical_nlp/golden/*` and `public/demo/*` from the real
+pipeline with the replay AI provider.
+
+Run the verification gate before pushing:
 
 ```bash
-make test
+make test                       # pytest · ruff · mypy --strict · oxlint · npm run build
 ```
 
-Open `http://localhost:3000` for the bilingual dashboard. The language switch persists across
-the upload workspace and the complete verified replay. API docs are available at
-`http://localhost:8000/docs`.
+## Environment
 
-Generate the deterministic replay artifacts:
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATAPILOT_DATA_DIR` | `.data` | Run store root (`<dir>/runs/<run_id>/…`, `<dir>/ai-cache/…`). Disk is the truth; a restarted API sees every run. |
+| `DATAPILOT_ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | CORS allow-list for the web app. |
+| `DATAPILOT_SYNC_PIPELINE` | unset | `1` runs the analysis pipeline inline instead of the two-worker thread pool (tests, golden generation). |
+| `DATAPILOT_API_TOKEN` | unset | When set, every `/v1/*` request must carry `Authorization: Bearer <token>`; `GET /health` stays open. |
+| `DATAPILOT_DOCS` | `1` | `0` disables `/docs` and `/openapi.json` (booth hygiene; `make demo` sets it). |
+| `DATAPILOT_AI_MODE` | `auto` | `auto` uses Anthropic when credentials resolve, else the deterministic provider; `off` forces deterministic; `replay` is deterministic labelled `verified-replay` (tests, golden files). |
+| `DATAPILOT_AI_CACHE` | `fallback` | `fallback` tries the live call first and serves a cached identical request on failure; `prefer` serves cache first; `off` disables. |
+| `ANTHROPIC_API_KEY` | unset | Anthropic credentials (or an `ant auth login` profile). Never committed, never baked into images. |
+| `ANTHROPIC_MODEL` | `claude-opus-5` | Model requested for the three bounded AI tasks. |
+| `ANTHROPIC_BASE_URL`, `HTTPS_PROXY` | unset | Honoured by the official SDK for venue networking. |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` | API base used by the web app. |
 
-```bash
-PYTHONPATH=services/api .venv/bin/python scripts/generate_golden.py
+## API
+
+The HTTP API is documented in `docs/BUILD-SPEC.md` §7. The main flow:
+
+```
+POST /v1/runs (multipart csv + optional contract)  or  POST /v1/runs/from-sample
+GET  /v1/runs/{id}/events            # SSE tail of the persisted event log
+GET  /v1/runs/{id}                   # report, contract, decisions, dry run, execution, brief
+PUT  /v1/runs/{id}/decisions         # outcomes limited to each finding's allowed_outcomes
+POST /v1/runs/{id}/dry-run           # typed change set + masked preview
+POST /v1/runs/{id}/apply             # idempotent (Idempotency-Key), 409 on stale hashes
+GET  /v1/runs/{id}/artifacts/...     # release.csv, manifest, change ledger, AI ledger, audit bundle
 ```
 
-The opt-in Anthropic smoke test is intentionally separate from normal tests. It sends only a
-small aggregate semantic request; use the manual GitHub workflow to run Haiku once, and enable
-the quality input only when one Sonnet comparison is needed.
+Every error is `{"error": {code, message_zh, message_en, retryable, correlation_id}}`; every
+response carries `X-Correlation-Id` and `Server-Timing`.
 
-The public demonstration uses synthetic data only. The live CSV endpoint is observational
-unless a valid Data Contract/Policy Pack is supplied.
-
-Run the complete local product with containers:
+## Containers
 
 ```bash
 docker compose up --build
 ```
 
-The published Sites preview intentionally switches to verified replay when no protected API URL
-is configured. It never directs a public visitor to `localhost` or describes replay as live work.
+`docker-compose.yml` passes `DATAPILOT_AI_MODE`, `DATAPILOT_AI_CACHE`, `ANTHROPIC_MODEL`,
+`ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `HTTPS_PROXY` through from the host shell; the API
+image contains no secrets and disables `/docs` by default.
+
+The offline replay at `/demo/clinical-nlp` is generated by `make golden` from the same engine
+and is always labelled as a replay. The public demonstration uses synthetic data only.
 
 ## Truth boundaries
 
-- The model never receives dataframe write access and never produces executable code.
-- Source CSV artifacts are immutable.
-- A proposal is not an action; policy and required review must authorize it.
+- The model never receives row-level data, sensitive values, dataframe write access, or the
+  ability to produce executable code; it sees redacted aggregates and returns structured JSON
+  that a deterministic grounding validator must accept before it is shown or executed.
+- Every AI call is recorded in the per-run ledger (model, prompt version, input hash, tokens,
+  latency, grounding result, redaction summary). When the AI is unavailable the system falls
+  back to deterministic behaviour and says so; it never labels a deterministic result as AI.
+- Source CSV artifacts are immutable; `record_uid` is derived from the dataset hash.
+- A proposal is not an action; policy and required human review must authorize it, and only
+  typed, allow-listed actions execute.
 - Quality score and release status are separate.
-- The demo replay is labeled and never presented as a live model run.
+- The demo replay is labelled and never presented as a live model run.
 - Potential sensitive-data detection is a conservative heuristic, not a compliance claim.

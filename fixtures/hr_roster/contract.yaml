@@ -1,0 +1,75 @@
+id: hr-roster
+version: 1.0.0
+title_zh: 人事花名册发布契约
+title_en: HR roster release contract
+
+score:
+  version: dq-1.0
+  weights:
+    completeness: 0.30
+    validity: 0.25
+    consistency: 0.25
+    uniqueness: 0.20
+
+business_key:
+  - employee_id
+
+fields:
+  employee_id:
+    required: true
+    unique: true
+  name:
+    sensitive: true
+  id_card:
+    sensitive: true
+  department:
+    required: true
+    canonical:
+      研发部:
+        - 研发
+        - R&D
+        - RD
+    allowed:
+      - 研发部
+      - 产品部
+      - 市场部
+      - 销售部
+      - 人力资源部
+      - 财务部
+      - 运营部
+  hire_date:
+    type: date
+    format: "%Y-%m-%d"
+    accept_formats:
+      - "%Y/%m/%d"
+      - "%Y年%m月%d日"
+  base_salary:
+    type: number
+    min: 2500
+  employment_type:
+    required: true
+    canonical:
+      全职:
+        - 全职员工
+        - Full-time
+        - FT
+    allowed:
+      - 全职
+      - 兼职
+      - 实习
+      - 外包
+    semantic: true
+  work_city:
+    allowed:
+      - 上海
+      - 北京
+      - 深圳
+      - 杭州
+      - 成都
+  email:
+    sensitive: true
+
+auto_authorization:
+  exact_duplicate_exclusion: true
+  category_normalization: true
+  date_standardization: true

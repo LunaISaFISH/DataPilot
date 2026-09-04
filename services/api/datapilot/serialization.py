@@ -53,6 +53,16 @@ def atomic_write_json(path: Path, value: Any) -> None:
         raise
 
 
+def atomic_append_line(path: Path, line: str) -> None:
+    """Append one line to a JSONL file; the line is written and fsynced in a single call."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = line.rstrip("\n") + "\n"
+    with open(path, "a", encoding="utf-8", newline="\n") as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
 def atomic_write_bytes(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")

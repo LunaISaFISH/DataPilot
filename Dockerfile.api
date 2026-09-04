@@ -1,12 +1,19 @@
 FROM python:3.12-slim
 
+# Runtime configuration is passed through the environment at `docker run` / compose time.
+# No secrets are baked into the image: ANTHROPIC_API_KEY is intentionally absent here.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DATAPILOT_DATA_DIR=/var/lib/datapilot
+    DATAPILOT_DATA_DIR=/var/lib/datapilot \
+    DATAPILOT_AI_MODE=auto \
+    DATAPILOT_AI_CACHE=fallback \
+    DATAPILOT_DOCS=0 \
+    ANTHROPIC_MODEL=claude-opus-5
 
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY services/api ./services/api
+COPY fixtures ./fixtures
 RUN pip install --no-cache-dir .
 
 RUN useradd --create-home --uid 10001 datapilot \
