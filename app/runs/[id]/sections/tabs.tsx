@@ -67,8 +67,8 @@ export function WorkspaceTabs() {
 
   return (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabId)} className="gap-0">
-      <div className="sticky top-0 z-10 border-b border-border bg-background px-3">
-        <TabsList variant="line" className="h-9 gap-0" aria-label={t('Console tabs', '控制台页签')}>
+      <div className="sticky top-0 z-10 overflow-x-auto border-b border-border bg-background px-3">
+        <TabsList variant="line" className="h-auto min-h-11 gap-0 sm:h-9 sm:min-h-0" aria-label={t('Console tabs', '控制台页签')}>
           {TAB_IDS.map((id) => {
             const availability = tabs[id];
             const count = tabCount(id, run);

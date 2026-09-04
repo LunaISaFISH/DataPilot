@@ -72,7 +72,7 @@
   --font-mono:
     'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, 'Noto Sans Mono CJK SC', monospace;
   --shell-sidebar-width: 208px;
-  --shell-strip-height: 40px;
+  --shell-strip-height: 44px;
 }
 
 @layer base {
@@ -369,5 +369,14 @@
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 639px) {
+  button,
+  [role='button'],
+  a[data-slot='button'] {
+    min-width: 44px;
+    min-height: 44px;
   }
 }

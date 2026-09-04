@@ -57,7 +57,7 @@ export function AppShell({ children }: AppShellProps) {
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'flex items-center gap-2 rounded-md px-2 text-[13px] font-medium transition-colors',
-                  orientation === 'vertical' ? 'h-8' : 'h-8 whitespace-nowrap',
+                  orientation === 'vertical' ? 'h-8' : 'h-11 whitespace-nowrap',
                   active ? 'bg-policy-tint text-policy' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >

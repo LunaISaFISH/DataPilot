@@ -37,7 +37,7 @@ export function aiCounters(findings: Finding[], ledger: AICallRecord[]): AiCount
 
 function Group({ children, title }: { children: React.ReactNode; title?: string }) {
   return (
-    <div className="flex items-center gap-2 whitespace-nowrap" title={title}>
+    <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto whitespace-nowrap" title={title}>
       {children}
     </div>
   );
