@@ -64,7 +64,7 @@ export function HeaderStrip() {
   const observational = !contractView || contract?.source === 'baseline';
 
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border bg-card px-3 py-1.5">
+    <header className="mx-3 mt-3 mb-3 flex flex-wrap items-center gap-x-5 gap-y-2.5 rounded-2xl border border-black/8 bg-white px-4 py-3 shadow-[0_12px_36px_rgba(16,35,30,0.04)] sm:mx-5 sm:px-5">
       <Group>
         <span className="max-w-[28ch] truncate text-[13px] font-semibold" title={run?.source_name ?? runId}>
           {run?.source_name ?? '—'}

@@ -67,7 +67,7 @@ export function WorkspaceTabs() {
 
   return (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabId)} className="gap-0">
-      <div className="sticky top-0 z-10 overflow-x-auto border-b border-border bg-background px-3">
+      <div className="sticky top-0 z-10 overflow-x-auto border-b border-black/7 bg-white px-3 sm:px-5">
         <TabsList variant="line" className="h-auto min-h-11 gap-0 sm:h-9 sm:min-h-0" aria-label={t('Console tabs', '控制台页签')}>
           {TAB_IDS.map((id) => {
             const availability = tabs[id];
@@ -89,7 +89,7 @@ export function WorkspaceTabs() {
         </TabsList>
       </div>
 
-      <div className="flex flex-col gap-3 p-3">
+      <div className="flex flex-col gap-4 p-4 sm:p-5">
         {run && running ? (
           <section className="panel flex flex-col gap-2 p-3" aria-live="polite">
             <div className="flex flex-wrap items-center gap-2 text-[13px]">

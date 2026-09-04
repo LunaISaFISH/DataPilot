@@ -117,8 +117,8 @@ export function ReplayHeader({ bundle }: { bundle: ReplayBundle | null }) {
       </div>
       <p className="border-t border-border px-3 py-1.5 text-xs leading-4 text-muted-foreground">
         {t(
-          'This page replays a recorded engine run from the static files under /demo. Nothing here calls a model or an API; every number is read from those files.',
-          '本页回放的是一次已记录的引擎运行，数据来自 /demo 下的静态文件。页面不调用模型，也不连接 API；所有数字均读取自这些文件。',
+          'Follow the results of a completed analysis. Every figure is reproduced from its verified report and release files.',
+          '这里展示一次已完成的分析，所有数字都来自经过核验的报告与发布文件。',
         )}
         {report?.synthetic === true ? <span> · {t('Synthetic data, not real clinical records.', '合成数据，非真实临床记录。')}</span> : null}
       </p>

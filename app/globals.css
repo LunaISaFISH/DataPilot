@@ -40,8 +40,8 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-2xl: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 }
 
 :root {
@@ -305,11 +305,12 @@
     border-color: var(--border);
   }
 
-  /* Bordered panel with no shadow. */
+  /* Product surfaces share the quiet, rounded visual language used by the guided demo. */
   .panel {
     background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 12px 36px rgb(16 35 30 / 0.04);
   }
 
   /* Yaml editor gutter + textarea. */

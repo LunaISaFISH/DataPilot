@@ -94,12 +94,12 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
   const noBase = error?.code === 'NO_API_BASE';
   const apiTone = connected ? 'policy' : loading ? 'review' : 'blocker';
   const apiText = connected
-    ? t('API connected', 'API 已连接')
+    ? t('Ready to analyse', '分析服务已就绪')
     : loading
-      ? t('API checking', 'API 检测中')
+      ? t('Connecting', '正在连接')
       : noBase
-        ? t('Replay only', '仅离线回放')
-        : t('API unreachable', 'API 未连接');
+        ? t('Demo available', '可使用演示')
+        : t('Service unavailable', '分析服务暂不可用');
   const aiLive = Boolean(health && health.ai.available && health.ai.provider === 'anthropic');
 
   return (
@@ -108,7 +108,7 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
         'flex h-(--shell-status-height) items-stretch justify-between border-b border-border bg-[#f7f9f7]',
         className,
       )}
-      aria-label={t('Engine status', '引擎状态')}
+      aria-label={t('Service status', '服务状态')}
     >
       <div className="data-dense flex min-w-0 items-stretch divide-x divide-border overflow-x-auto">
         <Item title={error && !noBase ? error.localized(language) : undefined}>
@@ -118,7 +118,7 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
         {health ? (
           <>
             <Item className="hidden sm:inline-flex">
-              <span className="text-muted-foreground">{t('Engine', '引擎')}</span>
+              <span className="text-muted-foreground">{t('Version', '版本')}</span>
               <span className="mono">{health.engine_version}</span>
             </Item>
             <Item className="hidden md:inline-flex">
@@ -156,11 +156,11 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
         >
           <PopoverTrigger
             className="inline-flex size-8 items-center justify-center rounded-md text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-7 sm:w-auto sm:max-w-64 sm:justify-start sm:gap-1.5 sm:border sm:border-border sm:bg-card sm:px-2"
-            aria-label={t('Configure backend API', '配置后端 API')}
+            aria-label={t('Connection settings', '连接设置')}
             title={apiBase ?? undefined}
           >
             <ServerCog aria-hidden="true" className="size-3.5 shrink-0" />
-            <span className="hidden shrink-0 sm:inline">{t('Backend', '后端')}</span>
+            <span className="hidden shrink-0 sm:inline">{t('Connection', '连接')}</span>
             <span className="mono hidden min-w-0 truncate text-[10px] text-muted-foreground lg:inline">{apiBase}</span>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[min(22rem,calc(100vw-1rem))] gap-3 p-3">

@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, RefreshCw, Upload } from 'lucide-react';
+import { ArrowRight, CheckCircle2, FileText, RefreshCw, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -223,14 +223,14 @@ function DropZone({ file, onFile, accept, extensions, title, hint, disabled = fa
           take(event.dataTransfer.files);
         }}
         className={cn(
-          'flex w-full cursor-pointer flex-col items-start justify-center gap-1 rounded-md border border-dashed px-3 text-left transition-colors',
-          compact ? 'min-h-14 py-2' : 'min-h-28 py-4',
-          dragging ? 'border-policy bg-policy-tint' : 'border-border bg-background hover:bg-muted/60',
+          'flex w-full cursor-pointer flex-col items-start justify-center gap-1.5 rounded-xl border border-dashed px-4 text-left transition-colors',
+          compact ? 'min-h-20 py-3' : 'min-h-32 py-5 sm:min-h-36',
+          dragging ? 'border-policy bg-policy-tint' : 'border-black/10 bg-[#f7faf8] hover:border-policy/30 hover:bg-policy-tint/35',
           'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-background',
         )}
       >
-        <span className="flex items-center gap-2 text-[13px] font-medium">
-          {compact ? <FileText aria-hidden="true" className="size-4 text-muted-foreground" /> : <Upload aria-hidden="true" className="size-4 text-muted-foreground" />}
+        <span className="flex items-center gap-2.5 text-sm font-semibold text-ink">
+          {compact ? <FileText aria-hidden="true" className="size-4 text-policy" /> : <Upload aria-hidden="true" className="size-5 text-policy" />}
           <span>{title}</span>
         </span>
         {file ? (
@@ -318,40 +318,42 @@ function NewAssessmentCard({ available }: { available: boolean }) {
         'Choose a CSV to start. Add a data contract for a full release review, or leave it out for a quick scan.',
         '选择一份 CSV 开始。添加数据契约可完成发布审核；不添加则进行快速扫描。',
       )}
-      className="h-full"
-      bodyClassName="flex flex-col gap-3 p-3"
+      className="h-full overflow-hidden border-black/8 shadow-[0_18px_60px_rgba(16,35,30,0.06)]"
+      bodyClassName="flex flex-col gap-4 p-5 sm:p-6"
     >
-      <DropZone
-        file={csv}
-        onFile={(next) => {
-          setCsv(next);
-          setEncoding('reading');
-          setError(null);
-        }}
-        accept=".csv,text/csv"
-        extensions={['.csv']}
-        title={t('Choose a CSV', '选择 CSV 文件')}
-        hint={t('Drop it here, or tap to browse · up to 25 MiB', '拖到这里，或点击选择 · 最大 25 MiB')}
-        disabled={!available || pending}
-      >
-        <span className="inline-flex items-center gap-1.5 text-xs">
-          <span className="text-muted-foreground">{t('Encoding hint', '编码提示')}</span>
-          <Pill variant={enc.tone === 'neutral' ? 'neutral' : enc.tone === 'review' ? 'review' : 'blocker'}>{enc.text}</Pill>
-        </span>
-      </DropZone>
-      <DropZone
-        file={contract}
-        onFile={(next) => {
-          setContract(next);
-          setError(null);
-        }}
-        accept=".yaml,.yml,application/x-yaml,text/yaml"
-        extensions={['.yaml', '.yml']}
-        title={t('Add a data contract (optional)', '添加数据契约（可选）')}
-        hint={t('YAML · up to 64 KiB', 'YAML 文件 · 最大 64 KiB')}
-        disabled={!available || pending}
-        compact
-      />
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1.25fr)_minmax(16rem,0.75fr)]">
+        <DropZone
+          file={csv}
+          onFile={(next) => {
+            setCsv(next);
+            setEncoding('reading');
+            setError(null);
+          }}
+          accept=".csv,text/csv"
+          extensions={['.csv']}
+          title={t('Choose a CSV', '选择 CSV 文件')}
+          hint={t('Drop it here, or tap to browse · up to 25 MiB', '拖到这里，或点击选择 · 最大 25 MiB')}
+          disabled={!available || pending}
+        >
+          <span className="inline-flex items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground">{t('Encoding hint', '编码提示')}</span>
+            <Pill variant={enc.tone === 'neutral' ? 'neutral' : enc.tone === 'review' ? 'review' : 'blocker'}>{enc.text}</Pill>
+          </span>
+        </DropZone>
+        <DropZone
+          file={contract}
+          onFile={(next) => {
+            setContract(next);
+            setError(null);
+          }}
+          accept=".yaml,.yml,application/x-yaml,text/yaml"
+          extensions={['.yaml', '.yml']}
+          title={t('Add a data contract (optional)', '添加数据契约（可选）')}
+          hint={t('YAML · up to 64 KiB', 'YAML 文件 · 最大 64 KiB')}
+          disabled={!available || pending}
+          compact
+        />
+      </div>
       <div className="text-[11px] leading-4 text-muted-foreground">
         {t(
           'We preview the file encoding in your browser. The analysis keeps the original file unchanged.',
@@ -359,7 +361,7 @@ function NewAssessmentCard({ available }: { available: boolean }) {
         )}
       </div>
       {error ? <GuardRow error={error} /> : null}
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3">
+      <div className="mt-auto flex flex-col gap-3 border-t border-black/7 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <span className="mono text-[11px] text-muted-foreground">
           {pending
             ? t('Preparing your analysis…', '正在准备分析…')
@@ -369,8 +371,9 @@ function NewAssessmentCard({ available }: { available: boolean }) {
                 : t('Ready for a quick scan', '可以开始快速扫描')
               : ''}
         </span>
-        <Button size="sm" disabled={!available || !csv || pending} onClick={() => void submit()}>
+        <Button className="min-h-11 justify-between rounded-xl px-4 sm:justify-center" size="lg" disabled={!available || !csv || pending} onClick={() => void submit()}>
           {pending ? t('Starting…', '正在启动…') : t('Start analysis', '开始分析')}
+          {!pending ? <ArrowRight aria-hidden="true" /> : null}
         </Button>
       </div>
     </PanelSection>
@@ -396,8 +399,9 @@ function SampleCard({
 }) {
   const { t, language } = useLanguage();
   const mine = pending?.id === sample.id ? pending : null;
+  const featured = sample.tags.includes('real-data');
   return (
-    <li className="flex flex-col gap-2 rounded-md border border-border bg-background p-3">
+    <li className={cn('flex flex-col gap-3 rounded-xl border p-4', featured ? 'border-policy/20 bg-policy-tint/25' : 'border-black/8 bg-[#fbfcfa]')}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="min-w-0">
           <div className="text-[13px] font-semibold leading-5">{pick(language, sample.title_zh, sample.title_en)}</div>
@@ -407,7 +411,7 @@ function SampleCard({
           {formatInt(sample.rows)} × {formatInt(sample.columns)}
         </div>
       </div>
-      <p className="text-xs leading-4 text-muted-foreground">{pick(language, sample.description_zh, sample.description_en)}</p>
+      <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{pick(language, sample.description_zh, sample.description_en)}</p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1">
           {sample.tags.map((tag) => (
@@ -417,7 +421,8 @@ function SampleCard({
         </div>
         <div className="flex items-center gap-1.5">
           <Button
-            size="xs"
+            size="sm"
+            className="min-h-9 rounded-lg px-3"
             disabled={disabled || !sample.has_contract}
             title={sample.has_contract ? undefined : t('This sample ships no contract', '该样例没有自带契约')}
             onClick={() => onStart(true)}
@@ -425,10 +430,11 @@ function SampleCard({
             {mine?.withContract ? t('Starting…', '启动中…') : t('Full review', '完整审核')}
           </Button>
           <Button
-            size="xs"
+            size="sm"
+            className="min-h-9 rounded-lg px-3"
             variant="outline"
             disabled={disabled}
-            title={t('Find visible issues without changing data or calling AI', '只查找可见问题，不修改数据，也不调用 AI')}
+            title={t('Get a fast view of the issues in this dataset', '快速了解这份数据中的问题')}
             onClick={() => onStart(false)}
           >
             {mine && !mine.withContract ? t('Starting…', '启动中…') : t('Quick scan', '快速扫描')}
@@ -460,23 +466,24 @@ function SamplesPanel({ available }: { available: boolean }) {
     }
   };
 
+  const orderedSamples = samples.data
+    ? [...samples.data].sort((left, right) => Number(right.tags.includes('real-data')) - Number(left.tags.includes('real-data')))
+    : null;
+
   return (
-    <PanelSection
-      id="samples"
-      title={t('Sample datasets', '样例数据')}
-      description={t(
-        'Try the complete workflow with four ready-to-use datasets, including real public retail data.',
-        '用四份现成数据体验完整流程，其中包含真实公开零售数据。',
-      )}
-      className="h-full"
-      bodyClassName="flex flex-col gap-2 p-3"
-      actions={
-        <Button size="xs" variant="ghost" disabled={!available || samples.loading} onClick={() => setTick((n) => n + 1)}>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-ink">{t('Choose a dataset', '选择一份数据')}</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {t('Start with real public retail data, or explore one of the synthetic industry examples.', '可先体验真实公开零售数据，也可以选择其他行业合成样例。')}
+          </p>
+        </div>
+        <Button size="sm" variant="ghost" disabled={!available || samples.loading} onClick={() => setTick((n) => n + 1)}>
           <RefreshCw data-icon="inline-start" aria-hidden="true" />
           {t('Refresh', '刷新')}
         </Button>
-      }
-    >
+      </div>
       {!available ? (
         <div className="text-xs text-muted-foreground">{t('Connect to the live service to open a sample.', '连接实时服务后即可打开样例。')}</div>
       ) : null}
@@ -490,12 +497,12 @@ function SamplesPanel({ available }: { available: boolean }) {
       {pending ? (
         <InFlight method="POST" path={`/v1/runs/from-sample · ${pending.id} · with_contract=${pending.withContract}`} />
       ) : null}
-      {samples.data ? (
-        samples.data.length === 0 ? (
+      {orderedSamples ? (
+        orderedSamples.length === 0 ? (
           <div className="text-xs text-muted-foreground">{t('No samples are available right now.', '当前没有可用样例。')}</div>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {samples.data.map((sample) => (
+          <ul className="grid gap-3 lg:grid-cols-2">
+            {orderedSamples.map((sample) => (
               <SampleCard
                 key={sample.id}
                 sample={sample}
@@ -507,7 +514,7 @@ function SamplesPanel({ available }: { available: boolean }) {
           </ul>
         )
       ) : null}
-    </PanelSection>
+    </div>
   );
 }
 
@@ -520,56 +527,65 @@ export default function WorkbenchPage() {
   const available = useLiveApiAvailable();
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-7 sm:px-6 sm:py-10">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-        <h1 className="text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{t('Start a real analysis', '开始一次真实分析')}</h1>
-        <p className="text-[13px] leading-5 text-muted-foreground">
-          {t(
-            'Use your own CSV, or open a sample below. Need an instant walkthrough? The 3-minute demo is always ready.',
-            '上传自己的 CSV，或从下方选择样例。如果想快速了解流程，3 分钟演示随时可用。',
-          )}
-        </p>
-        </div>
-        <Link href="/runs" className="min-h-11 self-start py-3 text-xs font-medium text-foreground underline-offset-4 hover:underline sm:self-auto">
-          {t('View previous analyses', '查看历史分析')} →
-        </Link>
-      </header>
-
-      {!available ? (
-        <InlineAlert
-          variant="info"
-          title={t('Live analysis is temporarily unavailable', '实时分析暂时不可用')}
-          actions={
-            <Button size="xs" variant="outline" nativeButton={false} render={<Link href="/demo" />}>
-              {t('Open the instant demo', '打开即时演示')}
-            </Button>
-          }
-        >
-          {t(
-            'Check the service address, or continue with the verified demo while the connection recovers.',
-            '请检查服务地址；连接恢复前，也可以继续使用已验证演示。',
-          )}
-        </InlineAlert>
-      ) : null}
-
-      <NewAssessmentCard available={available} />
-
-      <details id="samples" className="group overflow-hidden rounded-lg border border-border bg-card">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 marker:hidden">
+    <div className="min-h-[calc(100dvh-var(--shell-header-height)-var(--shell-status-height))] bg-[linear-gradient(180deg,#f7f8f5_0%,#eef3f1_72%)]">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-7 pb-16 sm:px-8 sm:pt-10 lg:px-10">
+        <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-sm font-semibold">{t('Try a sample dataset', '试用样例数据')}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              {t('Runs the real analysis service; larger samples can take a moment.', '会使用真实分析服务；较大样例可能需要稍等。')}
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-policy/20 bg-policy-tint px-3 py-1.5 text-xs font-medium text-policy">
+              <CheckCircle2 aria-hidden="true" className="size-3.5" />
+              {t('Ready for real data', '可分析真实数据')}
             </div>
+            <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink sm:text-3xl">{t('Start a new analysis', '开始新的数据分析')}</h1>
+            <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground sm:text-sm">
+              {t(
+                'Upload a CSV to understand its quality, review uncertain values, and prepare a safer dataset for downstream use.',
+                '上传一份 CSV，了解数据质量、审核不确定取值，并为下游使用准备一份更可靠的数据。',
+              )}
+            </p>
           </div>
-          <span className="text-xs font-medium text-policy group-open:hidden">{t('Show', '展开')}</span>
-          <span className="hidden text-xs font-medium text-policy group-open:inline">{t('Hide', '收起')}</span>
-        </summary>
-        <div className="border-t border-border p-3">
-          <SamplesPanel available={available} />
-        </div>
-      </details>
+          <Link
+            href="/runs"
+            className="inline-flex min-h-11 items-center gap-2 self-start rounded-xl border border-black/8 bg-white px-4 text-xs font-medium text-foreground shadow-[0_8px_24px_rgba(16,35,30,0.04)] transition-colors hover:bg-muted/50 sm:self-auto"
+          >
+            {t('View previous analyses', '查看历史分析')} →
+          </Link>
+        </header>
+
+        {!available ? (
+          <InlineAlert
+            variant="info"
+            title={t('Live analysis is temporarily unavailable', '实时分析暂时不可用')}
+            actions={
+              <Button size="xs" variant="outline" nativeButton={false} render={<Link href="/demo" />}>
+                {t('Open the instant demo', '打开即时演示')}
+              </Button>
+            }
+          >
+            {t(
+              'Check the service address, or continue with the verified demo while the connection recovers.',
+              '请检查服务地址；连接恢复前，也可以继续使用已验证演示。',
+            )}
+          </InlineAlert>
+        ) : null}
+
+        <NewAssessmentCard available={available} />
+
+        <details id="samples" className="group overflow-hidden rounded-2xl border border-black/8 bg-white shadow-[0_18px_60px_rgba(16,35,30,0.05)]">
+          <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-2 marker:hidden sm:px-6">
+            <div>
+              <div className="text-sm font-semibold">{t('Try a sample dataset', '试用样例数据')}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {t('Explore the same workflow with a prepared dataset.', '用准备好的数据体验同一套分析流程。')}
+              </div>
+            </div>
+            <span className="text-xs font-medium text-policy group-open:hidden">{t('Show', '展开')}</span>
+            <span className="hidden text-xs font-medium text-policy group-open:inline">{t('Hide', '收起')}</span>
+          </summary>
+          <div className="border-t border-black/7 p-5 sm:p-6">
+            <SamplesPanel available={available} />
+          </div>
+        </details>
+      </div>
     </div>
   );
 }

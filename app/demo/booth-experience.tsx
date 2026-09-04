@@ -219,7 +219,10 @@ function FactsStep() {
           <div>
             <h3 className="text-sm font-semibold text-ink">{t('What needs attention', '哪些问题需要处理')}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {t('Found directly in the data—AI has not been used yet.', '直接从数据中发现，这一步还没有使用 AI。')}
+              {t(
+                'Baseline checks establish the facts; semantic review comes next.',
+                '基础检查先确认客观事实，语义判断会在下一步介入。',
+              )}
             </p>
           </div>
           <span className="rounded-full bg-blocker-tint px-2.5 py-1 text-[11px] font-semibold text-blocker">
@@ -603,9 +606,9 @@ export function BoothExperience() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-review-tint px-2.5 py-1 text-[11px] font-semibold text-review">
                 <RotateCcw aria-hidden="true" className="size-3" />
-                {t('Verified replay · not live', '已验证回放 · 非实时运行')}
+                {t('Demo walkthrough · verified results', '演示回放 · 结果已核验')}
               </span>
-              <span className="text-[11px] text-muted-foreground">{t('Opens instantly · no API or AI call', '即开即看 · 不调用 API 或 AI')}</span>
+              <span className="text-[11px] text-muted-foreground">{t('Based on a completed analysis', '基于一次已完成的真实分析')}</span>
             </div>
             <h1 className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-ink sm:text-3xl">
               {t('From raw transactions to a safe handoff in 3 minutes', '3 分钟，看一份数据如何通过交付审核')}

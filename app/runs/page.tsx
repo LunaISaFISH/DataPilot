@@ -104,7 +104,7 @@ export default function RunsPage() {
       const created = await replayRun(row.run_id);
       router.push(`/runs/${encodeURIComponent(created.run_id)}`);
     } catch (reason) {
-      setActionError({ context: `POST /v1/runs/${row.run_id}/replay`, error: toApiError(reason) });
+      setActionError({ context: t('Could not rerun this analysis', '无法重新运行这次分析'), error: toApiError(reason) });
       setAction(null);
     }
   };
@@ -119,7 +119,7 @@ export default function RunsPage() {
       setDeleteTarget(null);
       refresh();
     } catch (reason) {
-      setActionError({ context: `DELETE /v1/runs/${target.run_id}`, error: toApiError(reason) });
+      setActionError({ context: t('Could not delete this analysis', '无法删除这次分析'), error: toApiError(reason) });
       setDeleteTarget(null);
     } finally {
       setAction(null);
@@ -203,20 +203,22 @@ export default function RunsPage() {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 lg:px-6">
-      <header className="flex flex-col gap-0.5">
-        <h1 className="text-base font-semibold leading-6">{t('Run history', '运行记录')}</h1>
-        <p className="text-[13px] leading-5 text-muted-foreground">
+    <div className="min-h-[calc(100dvh-var(--shell-header-height)-var(--shell-status-height))] bg-[linear-gradient(180deg,#f7f8f5_0%,#eef3f1_72%)]">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-7 pb-16 sm:px-8 sm:pt-10 lg:px-10">
+      <header className="flex flex-col gap-2">
+        <div className="text-xs font-medium text-policy">{t('Saved analyses', '历史分析')}</div>
+        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink sm:text-3xl">{t('Pick up where you left off', '继续之前的数据分析')}</h1>
+        <p className="max-w-2xl text-[13px] leading-6 text-muted-foreground sm:text-sm">
           {t(
-            'Every run directory in the store, newest first. Rerun creates a new run from the stored source and contract so hashes can be compared.',
-            '运行存储中的每个运行目录，按时间倒序。重跑会基于已存储的源文件与契约创建新运行，以便比对哈希。',
+            'Open a previous result, or rerun the same file to compare a fresh assessment with the earlier one.',
+            '打开以前的结果，或用同一份文件重新分析，对比前后的变化。',
           )}
         </p>
       </header>
 
       {!available ? (
-        <InlineAlert variant="info" title={t('Replay-only deployment', '当前为仅回放部署')}>
-          {t('Run history is only available with the local API.', '运行记录仅在连接本地 API 时可用。')}
+        <InlineAlert variant="info" title={t('Analysis history is temporarily unavailable', '历史分析暂时不可用')}>
+          {t('Your saved analyses will appear again when the service reconnects.', '服务恢复连接后，你保存的分析会重新显示。')}
         </InlineAlert>
       ) : null}
 
@@ -226,8 +228,9 @@ export default function RunsPage() {
         description={
           runs
             ? t(`${filtered.length} of ${runs.length} shown`, `显示 ${filtered.length} / ${runs.length} 条`)
-            : t('GET /v1/runs', 'GET /v1/runs')
+            : t('Loading your recent work…', '正在加载最近的分析…')
         }
+        className="border-black/8 shadow-[0_18px_60px_rgba(16,35,30,0.05)]"
         flush
         actions={
           <>
@@ -263,11 +266,11 @@ export default function RunsPage() {
         }
       >
         {loading && !runs ? (
-          <div className="mono px-3 py-2 text-[11px] text-muted-foreground" aria-live="polite">
-            GET /v1/runs …
+          <div className="px-4 py-4 text-xs text-muted-foreground" aria-live="polite">
+            {t('Loading analyses…', '正在加载分析…')}
           </div>
         ) : null}
-        {loadError ? <GuardRow error={loadError} title="GET /v1/runs" className="m-3" /> : null}
+        {loadError ? <GuardRow error={loadError} title={t('Could not load analysis history', '无法加载历史分析')} className="m-3" /> : null}
         {actionError ? <GuardRow error={actionError.error} title={actionError.context} className="m-3" /> : null}
         <DataTable
           columns={columns}
@@ -284,7 +287,7 @@ export default function RunsPage() {
           }
           emptyDescription={
             available && (!runs || runs.length === 0) ? (
-              <Link href="/" className="text-policy underline-offset-2 hover:underline">
+              <Link href="/workbench" className="text-policy underline-offset-2 hover:underline">
                 {t('Create one from the workbench', '前往工作台创建')}
               </Link>
             ) : undefined
@@ -317,13 +320,10 @@ export default function RunsPage() {
               <dt className="text-muted-foreground">{t('Source', '来源文件')}</dt>
               <dd className="truncate">{deleteTarget.source_name}</dd>
             </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">{t('Request', '请求')}</dt>
-              <dd className="mono text-xs">DELETE /v1/runs/{deleteTarget.run_id}</dd>
-            </div>
           </dl>
         ) : null}
       </ConfirmDialog>
+      </div>
     </div>
   );
 }

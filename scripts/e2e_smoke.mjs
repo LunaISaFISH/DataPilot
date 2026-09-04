@@ -47,7 +47,7 @@ try {
   // The booth replay is an instant, build-time snapshot: no backend and no model call.
   await page.goto(`${web}/demo?e2e=booth`, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.getByRole('heading', { name: 'From raw transactions to a safe handoff in 3 minutes' }).waitFor();
-  await page.getByText('Verified replay · not live', { exact: true }).waitFor();
+  await page.getByText('Demo walkthrough · verified results', { exact: true }).waitFor();
   await page.getByText('42,481', { exact: true }).first().waitFor();
   requireCondition(demoApiRequests.length === 0, `booth replay made API requests:\n${demoApiRequests.join('\n')}`);
   await page.screenshot({ path: `${output}/01-booth-facts.png`, fullPage: true });
@@ -66,7 +66,7 @@ try {
 
   // The real workbench remains available as a separate live mode.
   await page.goto(`${web}/workbench?e2e=live`, { waitUntil: 'networkidle', timeout: 30_000 });
-  await page.getByText('API connected', { exact: true }).waitFor({ timeout: 15_000 });
+  await page.getByText('Ready to analyse', { exact: true }).waitFor({ timeout: 15_000 });
   await page.getByText('Try a sample dataset', { exact: true }).click();
   const samples = page.locator('#samples li');
   requireCondition((await samples.count()) === 4, `expected 4 samples, saw ${await samples.count()}`);
@@ -78,6 +78,7 @@ try {
   const observationalStarted = Date.now();
   await uci.getByRole('button', { name: 'Quick scan' }).click();
   await page.waitForURL(/\/runs\/[a-f0-9]+/, { timeout: 30_000 });
+  const observationalUrl = page.url();
   await page.getByText('Observational', { exact: true }).first().waitFor({ timeout: 30_000 });
   const observationalMs = Date.now() - observationalStarted;
   requireCondition(observationalMs < 30_000, 'UCI observational run exceeded 30 seconds');
@@ -85,7 +86,7 @@ try {
   await page.screenshot({ path: `${output}/05-observational.png`, fullPage: true });
 
   await page.goto(`${web}/workbench?e2e=contracted`, { waitUntil: 'networkidle', timeout: 30_000 });
-  await page.getByText('API connected', { exact: true }).waitFor({ timeout: 15_000 });
+  await page.getByText('Ready to analyse', { exact: true }).waitFor({ timeout: 15_000 });
   await page.getByText('Try a sample dataset', { exact: true }).click();
   const ecommerce = page.locator('#samples li').filter({ hasText: 'ecommerce_orders' });
   await ecommerce.getByRole('button', { name: 'Full review' }).click();
@@ -145,6 +146,27 @@ try {
   await page.getByRole('button', { name: '切换到中文' }).click();
   await page.getByRole('heading', { name: '3 分钟，看一份数据如何通过交付审核' }).waitFor();
   await page.screenshot({ path: `${output}/09-mobile-zh.png`, fullPage: true });
+
+  await page.goto(`${web}/workbench?e2e=mobile-live`, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.getByText('Ready to analyse', { exact: true }).waitFor({ timeout: 15_000 });
+  await page.getByRole('button', { name: '切换到中文' }).click();
+  await page.getByText('分析服务已就绪', { exact: true }).waitFor({ timeout: 15_000 });
+  await page.getByRole('heading', { name: '开始新的数据分析' }).waitFor();
+  requireCondition(
+    (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0,
+    'mobile workbench overflows horizontally',
+  );
+  await page.screenshot({ path: `${output}/10-mobile-workbench-zh.png`, fullPage: true });
+
+  await page.goto(observationalUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  await page.getByText('Observational', { exact: true }).first().waitFor({ timeout: 15_000 });
+  await page.getByRole('button', { name: '切换到中文' }).click();
+  await page.getByText('仅观测', { exact: true }).first().waitFor({ timeout: 15_000 });
+  requireCondition(
+    (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0,
+    'mobile run workspace overflows horizontally',
+  );
+  await page.screenshot({ path: `${output}/11-mobile-run-zh.png`, fullPage: true });
 
   requireCondition(runtimeErrors.length === 0, `browser runtime errors:\n${runtimeErrors.join('\n')}`);
   console.log(`OK browser flow; screenshots: ${output}`);

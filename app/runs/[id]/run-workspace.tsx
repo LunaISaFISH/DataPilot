@@ -299,10 +299,10 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
 
   return (
     <WorkspaceContext.Provider value={value}>
-      <div className="data-dense flex h-[calc(100dvh-var(--shell-header-height)-var(--shell-status-height))] min-h-0 flex-col bg-background">
+      <div className="data-dense flex h-[calc(100dvh-var(--shell-header-height)-var(--shell-status-height))] min-h-0 flex-col bg-[linear-gradient(180deg,#f7f8f5_0%,#eef3f1_72%)]">
         <HeaderStrip />
         {loadError && !run ? (
-          <div className="p-3">
+          <div className="px-3 pb-3 sm:px-5">
             <GuardRow
               error={loadError}
               title={
@@ -315,21 +315,21 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
           </div>
         ) : null}
         {!run && !loadError ? (
-          <div className="p-3">
+          <div className="px-3 pb-3 sm:px-5">
             <InlineAlert variant="info" title={t('Loading run', '正在加载运行')}>
-              <span className="mono">GET /v1/runs/{runId}</span>
+              {t('Preparing the latest results…', '正在准备最新结果…')}
             </InlineAlert>
           </div>
         ) : null}
-        <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_360px]">
-          <aside className="hidden min-h-0 flex-col overflow-y-auto border-r border-border bg-card xl:flex">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 px-3 pb-3 sm:px-5 sm:pb-5 xl:grid-cols-[220px_minmax(0,1fr)_360px]">
+          <aside className="hidden min-h-0 flex-col overflow-y-auto rounded-2xl border border-black/8 bg-white shadow-[0_12px_36px_rgba(16,35,30,0.04)] xl:flex">
             <LifecycleRail />
             <EventLogPanel mode="rail" />
           </aside>
-          <section className="min-h-0 min-w-0 overflow-y-auto">
+          <section className="min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-black/8 bg-white shadow-[0_12px_36px_rgba(16,35,30,0.04)]">
             <WorkspaceTabs />
           </section>
-          <aside className={cn('min-h-0 overflow-y-auto border-t border-border bg-card xl:block xl:border-t-0 xl:border-l', selectedFindingId ? 'block' : 'hidden')}>
+          <aside className={cn('min-h-0 overflow-y-auto rounded-2xl border border-black/8 bg-white shadow-[0_12px_36px_rgba(16,35,30,0.04)] xl:block', selectedFindingId ? 'block' : 'hidden')}>
             {selectedFindingId ? <FindingInspector findingId={selectedFindingId} /> : <AiSupervisionRail />}
           </aside>
         </div>

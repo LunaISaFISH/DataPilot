@@ -94,8 +94,8 @@ export function replayAiCounters(findings: ReplayFinding[]): ReplayAiCounters {
 export function ReplayBadge({ className }: { className?: string }) {
   const { t } = useLanguage();
   return (
-    <Pill variant="review" className={className} title={t('Recorded engine run; nothing on this page is live.', '已记录的引擎运行；本页没有任何实时内容。')}>
-      {t('Offline replay · not live', '离线回放 · 非实时')}
+    <Pill variant="review" className={className} title={t('A guided view of one completed analysis.', '一次已完成分析的引导式展示。')}>
+      {t('Demo walkthrough · verified results', '演示回放 · 结果已核验')}
     </Pill>
   );
 }
