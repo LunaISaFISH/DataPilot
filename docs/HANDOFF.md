@@ -1,14 +1,14 @@
-# DataPilot v0.2 发布前交接
+# DataPilot v0.2 已发布交接
 
-Updated: 2026-09-04 (Asia/Singapore)
+Updated: 2026-09-05 (Asia/Singapore)
 
 `docs/BUILD-SPEC.md` 是实现规格，`docs/TASK.md` 是最新运行状态，`docs/DEMO.md` 是招聘会现场脚本。本文只保留下一次接手真正需要的信息。
 
 ## 当前结论
 
-- 分支为 `main`，基于已推送的 `cbb5c39`；本轮改动尚未提交，必须先得到项目所有者明确许可。
+- 分支为 `main`；v0.2 主体发布提交为 `7a1a607`，作者身份是已确认的 Luna。
 - 现有站点和域名继续复用：`https://datapilotgo.com`。不要创建第二个 Site。
-- 现有 API 继续复用：`https://datapilotgo-api.fly.dev`。公网仍是旧镜像，不能把本地结果描述成已上线。
+- 现有 API 继续复用：`https://datapilotgo-api.fly.dev`。公网已运行 engine `0.2.0`，默认模型为 Haiku。
 - 招聘会主入口改为 `/demo`：真实 UCI 已完成运行的四步验证回放，即开即用、零后端请求、零模型费用，并始终标注为非实时。
 - `/workbench` 保留真实 CSV、四个样例、快速扫描、契约分析、人工处置、执行、验证与下载能力。
 
@@ -39,13 +39,13 @@ Updated: 2026-09-04 (Asia/Singapore)
 - 42,884 affected cells；7/7 findings dispositioned；14/14 validations；10/10 independent verification；`CONDITIONAL_PASS`。
 - 快照位于 `lib/data/uci-online-retail-replay.json`，生成与校验逻辑位于 `scripts/export_verified_replay.py`。
 
-## 只剩发布
+## 发布结果
 
-1. 获得所有者许可后，以已确认的 Luna Git identity 提交并推送 `main`；不要使用代理或机器人作者。
-2. 用现有 `fly.toml` 部署 `datapilotgo-api`，先检查 secret 名存在，不显示值；验证公网 `/health`，先跑零模型费用的快速扫描，再按需跑一次小型 AI smoke。
-3. 从推送后的精确 commit 构建 Sites 包，保存版本并发布到现有 Site；运行时后端地址使用 `https://datapilotgo-api.fly.dev`。
-4. 在真实手机网络打开 `https://datapilotgo.com/demo` 与 `/workbench`，确认 Haiku 默认值、即时回放、快速扫描和域名证书。
-5. 将真实 commit、部署版本与公网 smoke 结果写回 `docs/TASK.md`。
+1. `datapilotgo-api` 已完成滚动发布；公网 `/health`、完整 demo smoke、14/14 validation 和独立 verify 全部通过。
+2. 现有公开 Site 已从精确提交构建并发布，运行时后端地址为 `https://datapilotgo-api.fly.dev`。
+3. `https://datapilotgo.com/demo` 已在 390 × 844 下完成中英文四步检查，零 API 请求且无横向溢出。
+4. `https://datapilotgo.com/workbench` 已从公网完成 UCI 快速扫描；测试 run 随后删除，未污染现场列表。
+5. 回放审计区明确说明 Opus 是历史运行记录、打开回放不会发起调用；新的实时运行默认使用 Haiku。
 
 ## 安全提醒
 
@@ -54,17 +54,6 @@ Updated: 2026-09-04 (Asia/Singapore)
 - 实时模型只接收脱敏聚合值；模型异常、超时、格式错误或预算耗尽都必须如实进入台账并 fail closed。
 - 不要把回放说成实时运行，不要把隔离或发布排除说成删除源数据。
 
-## 下一条命令
+## 下一次接手
 
-在获得提交与发布许可后：
-
-```bash
-git status --short --branch
-git diff --check
-make test
-git add -A
-git commit -m "feat: finish DataPilot v0.2 booth release"
-git push origin main
-```
-
-提交完成后再部署 Fly 和 Sites；保存 Sites 版本前必须重新从该精确 commit 构建发布包。
+先运行 `git status --short --branch` 和 `make test`。招聘会优先使用 `/demo`；只有需要展示实时上传、契约或 AI 台账时才进入 `/workbench`。若改动前端，继续复用当前 Site 与域名；若改动后端，继续复用当前 Fly app。

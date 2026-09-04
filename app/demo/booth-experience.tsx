@@ -567,8 +567,14 @@ function AuditDetails() {
         </div>
         <div className="space-y-3">
           <div className="font-semibold">{t('AI call record', 'AI 调用记录')}</div>
+          <p className="leading-5 text-muted-foreground">
+            {t(
+              'Recorded during the completed run. Opening this replay makes no new model call; new live runs default to Haiku.',
+              '来自已完成运行的历史记录。打开回放不会产生新的模型调用；新的实时运行默认使用 Haiku。',
+            )}
+          </p>
           <div className="flex justify-between gap-3"><span className="text-muted-foreground">provider</span><span className="mono">{call?.provider}</span></div>
-          <div className="flex justify-between gap-3"><span className="text-muted-foreground">model served</span><span className="mono max-w-44 truncate" title={call?.model_served ?? undefined}>{call?.model_served}</span></div>
+          <div className="flex justify-between gap-3"><span className="text-muted-foreground">{t('recorded model', '记录模型')}</span><span className="mono max-w-44 truncate" title={call?.model_served ?? undefined}>{call?.model_served}</span></div>
           <div className="flex justify-between gap-3"><span className="text-muted-foreground">prompt</span><span className="mono">{call?.prompt_version}</span></div>
           <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">input</span><HashChip value={call?.input_hash} length={10} /></div>
         </div>
