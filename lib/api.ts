@@ -40,8 +40,9 @@ import type {
 
 export const API_BASE_STORAGE_KEY = 'datapilot.apiBaseUrl';
 export const DEFAULT_API_BASE = 'http://localhost:8000';
+export const PUBLIC_API_BASE = 'https://datapilotgo-api.fly.dev';
 
-export type ApiBaseSource = 'query' | 'storage' | 'environment' | 'default';
+export type ApiBaseSource = 'query' | 'storage' | 'environment' | 'public' | 'default';
 export type ApiBaseConfig = {
   base: string;
   source: ApiBaseSource;
@@ -80,10 +81,24 @@ function queryApiBase(): string | null {
 function storedApiBase(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return normalizeApiBase(window.localStorage.getItem(API_BASE_STORAGE_KEY));
+    const stored = normalizeApiBase(window.localStorage.getItem(API_BASE_STORAGE_KEY));
+    if (!stored) return null;
+    const hostname = window.location.hostname.toLowerCase();
+    const apiHostname = new URL(stored).hostname.toLowerCase();
+    if (isPublicFrontend(hostname) && (apiHostname === 'localhost' || apiHostname === '127.0.0.1' || apiHostname === '::1')) return null;
+    return stored;
   } catch {
     return null;
   }
+}
+
+function isPublicFrontend(hostname: string): boolean {
+  return hostname === 'datapilotgo.com' || hostname === 'www.datapilotgo.com' || hostname.endsWith('.chatgpt.site');
+}
+
+function publicApiBase(): string | null {
+  if (typeof window === 'undefined') return null;
+  return isPublicFrontend(window.location.hostname.toLowerCase()) ? PUBLIC_API_BASE : null;
 }
 
 function resolveApiBaseConfig(): ApiBaseConfig {
@@ -92,10 +107,12 @@ function resolveApiBaseConfig(): ApiBaseConfig {
   const stored = storedApiBase();
   if (stored) return { base: stored, source: 'storage' };
   if (configuredApiBase) return { base: configuredApiBase, source: 'environment' };
+  const publicBase = publicApiBase();
+  if (publicBase) return { base: publicBase, source: 'public' };
   return { base: DEFAULT_API_BASE, source: 'default' };
 }
 
-/** `?api=` → local storage → build-time environment → localhost default. */
+/** `?api=` → local storage → build-time environment → public service → localhost default. */
 export function resolveApiBase(): string {
   return resolveApiBaseConfig().base;
 }

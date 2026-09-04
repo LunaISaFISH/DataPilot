@@ -69,7 +69,9 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
         ? t('Saved override', '已保存覆盖')
         : apiBaseSource === 'environment'
           ? t('Environment', '环境变量')
-          : t('Local default', '本地默认');
+          : apiBaseSource === 'public'
+            ? t('Public service', '公网服务')
+            : t('Local default', '本地默认');
 
   const saveApiBase = () => {
     setSavedMessage(false);
