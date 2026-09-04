@@ -49,7 +49,7 @@ export function YamlEditor({
         autoCapitalize="off"
         autoCorrect="off"
         wrap="off"
-        aria-label={ariaLabel ?? t('Data Contract YAML', '数据契约 YAML')}
+        aria-label={ariaLabel ?? t('Data Contract YAML', '发布规则 YAML')}
         aria-invalid={invalid || undefined}
         style={{ maxHeight }}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}

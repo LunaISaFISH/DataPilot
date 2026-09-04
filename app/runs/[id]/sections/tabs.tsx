@@ -20,13 +20,13 @@ import { ProfileTab } from './profile-tab';
 import { ReleaseTab } from './release-tab';
 
 const TAB_LABEL: Record<TabId, readonly [zh: string, en: string]> = {
-  profile: ['画像', 'Profile'],
-  contract: ['契约', 'Contract'],
-  findings: ['发现', 'Findings'],
-  decisions: ['处置', 'Decisions'],
-  changeset: ['变更集', 'Change set'],
-  release: ['验证与发布', 'Validate and release'],
-  artifacts: ['工件', 'Artifacts'],
+  profile: ['概览', 'Profile'],
+  contract: ['规则', 'Contract'],
+  findings: ['问题', 'Findings'],
+  decisions: ['处理', 'Decisions'],
+  changeset: ['预览', 'Change set'],
+  release: ['交付', 'Validate and release'],
+  artifacts: ['文件', 'Artifacts'],
 };
 
 const TAB_COMPONENT: Record<TabId, () => React.JSX.Element | null> = {
@@ -68,7 +68,7 @@ export function WorkspaceTabs() {
   return (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabId)} className="gap-0">
       <div className="sticky top-0 z-10 overflow-x-auto border-b border-black/7 bg-white px-3 sm:px-5">
-        <TabsList variant="line" className="h-auto min-h-11 gap-0 sm:h-9 sm:min-h-0" aria-label={t('Console tabs', '控制台页签')}>
+        <TabsList variant="line" className="h-auto min-h-11 gap-0 sm:h-9 sm:min-h-0" aria-label={t('Analysis steps', '分析步骤')}>
           {TAB_IDS.map((id) => {
             const availability = tabs[id];
             const count = tabCount(id, run);
@@ -78,7 +78,7 @@ export function WorkspaceTabs() {
                 value={id}
                 disabled={availability.locked}
                 title={availability.locked && availability.reason ? availability.reason : undefined}
-                className={cn('flex-none px-2.5 text-[13px]', availability.locked && 'text-muted-foreground')}
+                className={cn('flex-none px-2.5 text-[13px]', availability.locked && 'hidden text-muted-foreground sm:inline-flex')}
               >
                 {availability.locked ? <Lock aria-hidden="true" className="size-3" /> : null}
                 {pick(language, TAB_LABEL[id][0], TAB_LABEL[id][1])}
@@ -119,7 +119,7 @@ export function WorkspaceTabs() {
               </span>
             }
           >
-            <div>{run.error ?? (failedEvent ? pick(language, failedEvent.message_zh, failedEvent.message_en) : t('The pipeline failed.', '流水线执行失败。'))}</div>
+            <div>{run.error ?? (failedEvent ? pick(language, failedEvent.message_zh, failedEvent.message_en) : t('The pipeline failed.', '分析未能完成。'))}</div>
             {failedEvent && typeof failedEvent.detail.correlation_id === 'string' ? (
               <div className="mt-1 text-[11px]">
                 {t('Correlation id', '关联 ID')} <span className="mono">{failedEvent.detail.correlation_id}</span>
@@ -136,7 +136,7 @@ export function WorkspaceTabs() {
               {availability.locked ? (
                 <EmptyState
                   icon={<Lock />}
-                  title={`${pick(language, TAB_LABEL[id][0], TAB_LABEL[id][1])} · ${t('Locked', '未解锁')}`}
+                  title={`${pick(language, TAB_LABEL[id][0], TAB_LABEL[id][1])} · ${t('Locked', '暂不可用')}`}
                   description={availability.reason ?? undefined}
                 />
               ) : (

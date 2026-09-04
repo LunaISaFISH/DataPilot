@@ -53,19 +53,19 @@ export function DeterministicCard({ finding, record, events, semantic }: {
   let reasonZh: string;
   let reasonEn: string;
   if (status && FALLBACK_STATUSES.has(status)) {
-    reasonZh = `模型调用状态为「${label('ai_status', status, 'zh')}」，引擎改用确定性归一化结果。`;
+    reasonZh = `本次 AI 判断状态为「${label('ai_status', status, 'zh')}」，系统保留了规则能够确认的结果。`;
     reasonEn = `The model call ended with status “${label('ai_status', status, 'en')}”; the engine used its deterministic normalisation instead.`;
-  } else if (eventReason) {
-    reasonZh = `流水线在语义分析阶段报告 AI 不可用（${eventReason}），全部 SEM 提议由确定性规则生成。`;
+  } else if (semantic && eventReason) {
+    reasonZh = `本次 AI 判断未完成（${eventReason}），系统保留了规则能够确认的结果。`;
     reasonEn = `The pipeline reported AI unavailable during semantic analysis (${eventReason}); every SEM proposal came from deterministic rules.`;
   } else if (semantic && proposal && proposal.provider !== 'anthropic') {
-    reasonZh = `提议由 ${label('provider', proposal.provider, 'zh')} 生成（${proposal.model}），未调用模型。`;
+    reasonZh = `本次采用${label('provider', proposal.provider, 'zh')}的可复现判断（${proposal.model}），结果可以重新核验。`;
     reasonEn = `Proposal produced by ${label('provider', proposal.provider, 'en')} (${proposal.model}); no model was called.`;
   } else if (semantic) {
-    reasonZh = '本问题没有可用的模型提议记录；引擎按确定性规则评估。';
+    reasonZh = 'AI 暂未给出可用建议，当前仅保留规则能够确认的结果。';
     reasonEn = 'No model proposal is recorded for this finding; the engine assessed it deterministically.';
   } else {
-    reasonZh = '该类问题由确定性检测器直接产生（重复、别名、格式、缺失、敏感模式），不涉及模型。';
+    reasonZh = '系统已按明确规则确认问题范围；后续处理仍需满足发布规则。';
     reasonEn = 'This finding family is produced directly by deterministic detectors (duplicates, aliases, formats, missing, sensitive patterns); no model is involved.';
   }
 
@@ -76,17 +76,20 @@ export function DeterministicCard({ finding, record, events, semantic }: {
         {status ? <Pill variant={FALLBACK_STATUSES.has(status) ? 'blocker' : 'neutral'}>{label('ai_status', status, language)}</Pill> : null}
         {finding.proposed_action ? (
           <span className="text-xs text-muted-foreground">
-            {t('Proposed action', '提议动作')} · <span className="mono">{finding.proposed_action}</span>
+            {t('Suggested handling', '建议处理')} · <span>{label('allowed_action', finding.proposed_action, language)}</span>
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">{t('No executable proposal', '无可执行提议')}</span>
+          <span className="text-xs text-muted-foreground">{t('No automatic action', '暂无自动处理')}</span>
         )}
       </div>
       <p className="text-xs leading-4">{pick(language, reasonZh, reasonEn)}</p>
-      {event ? (
-        <p className="mono text-[11px] text-muted-foreground" suppressHydrationWarning>
-          {formatTime(event.ts)} · {event.stage} · {pick(language, event.message_zh, event.message_en)}
-        </p>
+      {event && semantic ? (
+        <details className="text-[11px] text-muted-foreground">
+          <summary className="cursor-pointer">{t('Technical record', '查看技术记录')}</summary>
+          <p className="mono mt-1" suppressHydrationWarning>
+            {formatTime(event.ts)} · {event.stage} · {pick(language, event.message_zh, event.message_en)}
+          </p>
+        </details>
       ) : null}
       {proposal?.mapping && Object.keys(proposal.mapping).length > 0 ? (
         <div className="dp-table-wrap">

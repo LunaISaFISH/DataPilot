@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
 import { formatInt } from '@/lib/format';
-import { pick, useLanguage, type Language } from '@/lib/language';
-import { findingPrefixOf, label } from '@/lib/labels';
+import { useLanguage, type Language } from '@/lib/language';
+import { findingDisplayTitle, findingPrefixOf, label } from '@/lib/labels';
 import type { AICallRecord, DecisionInput, DecisionOutcome, DecisionsResponse, Finding, RunDetail } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -71,19 +71,19 @@ function sameForm(a: FormState, b: FormState): boolean {
 /** Why an outcome is disabled for a finding, in policy terms. */
 function disallowedReason(finding: Finding, outcome: DecisionOutcome, language: Language, record: AICallRecord | null): string {
   const zh = language === 'zh';
-  if (finding.authorization_mode === 'QUARANTINE_ONLY' && outcome !== 'QUARANTINE') return zh ? '仅允许隔离' : 'Quarantine only';
-  if (finding.authorization_mode === 'FORBIDDEN') return zh ? '策略禁止自动处理' : 'Policy forbids automated handling';
+  if (finding.authorization_mode === 'QUARANTINE_ONLY' && outcome !== 'QUARANTINE') return zh ? '为避免误改，这个问题只能先隔离' : 'Quarantine only';
+  if (finding.authorization_mode === 'FORBIDDEN') return zh ? '当前只展示问题，不会自动处理' : 'Policy forbids automated handling';
   if (outcome === 'APPROVE_PROPOSAL') {
     if (isSemFinding(finding.finding_id)) {
       const proposal = finding.proposal;
-      if (record?.status === 'rejected_by_grounding' || (proposal && !proposal.grounding.valid)) return zh ? 'AI 提议未通过接地校验' : 'AI proposal failed grounding';
-      if (!proposal) return zh ? '无 AI 提议' : 'No AI proposal';
-      if (proposal.abstained) return zh ? 'AI 已弃权，无可批准的提议' : 'AI abstained; nothing to approve';
+      if (record?.status === 'rejected_by_grounding' || (proposal && !proposal.grounding.valid)) return zh ? 'AI 建议未通过证据校验' : 'AI proposal failed grounding';
+      if (!proposal) return zh ? 'AI 没有给出建议' : 'No AI proposal';
+      if (proposal.abstained) return zh ? 'AI 暂不判断，没有可采用的建议' : 'AI abstained; nothing to approve';
     }
-    if (finding.proposed_action === null) return zh ? '无可执行提议' : 'No executable proposal';
+    if (finding.proposed_action === null) return zh ? '目前没有可执行的建议' : 'No executable proposal';
   }
   if (outcome === 'EXCLUDE' && findingPrefixOf(finding.finding_id) !== 'PHI') return zh ? '仅敏感字段可整列排除' : 'Only sensitive columns can be excluded';
-  return zh ? '契约未允许该结果' : 'Not allowed by the contract';
+  return zh ? '当前发布规则不允许这样处理' : 'Not allowed by the contract';
 }
 
 function DecisionRow({ finding, entry, disabled, onChange }: {
@@ -107,22 +107,22 @@ function DecisionRow({ finding, entry, disabled, onChange }: {
         <div className="flex min-w-0 flex-col gap-0.5">
           <button type="button" className="flex flex-wrap items-center gap-2 text-left hover:underline" onClick={() => setSelectedFindingId(finding.finding_id)} title={t('Open in the inspector', '在右侧查看详情')}>
             <span className="mono text-xs font-semibold">{finding.finding_id}</span>
-            <span className="text-[13px] leading-5">{pick(language, finding.title_zh, finding.title_en)}</span>
+            <span className="text-[13px] leading-5">{findingDisplayTitle(finding, language)}</span>
           </button>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <RiskDot value={finding.risk_level} />
-            <AuthCodeChip value={finding.authorization_mode} />
+            <span className="hidden sm:inline-flex"><AuthCodeChip value={finding.authorization_mode} /></span>
             <span className="text-muted-foreground">{label('authorization_mode', finding.authorization_mode, language)}</span>
-            {finding.column ? <Stat k={t('column', '列')} v={<span className="mono">{finding.column}</span>} /> : null}
+            {finding.column ? <Stat k={t('field', '字段')} v={<span className="mono">{finding.column}</span>} /> : null}
             <Stat k={t('records', '记录')} v={formatInt(finding.affected_record_count)} />
-            {finding.blocking ? <Pill variant="blocker">{t('Blocking', '阻断')}</Pill> : null}
+            {finding.blocking ? <Pill variant="blocker">{t('Affects release', '影响交付')}</Pill> : null}
           </div>
         </div>
-        <span className={cn('text-[11px] whitespace-nowrap', entry.outcome ? 'text-policy' : 'text-review')}>{entry.outcome ? t('Decided', '已选择') : t('Unresolved', '未处置')}</span>
+        <span className={cn('text-[11px] whitespace-nowrap', entry.outcome ? 'text-policy' : 'text-review')}>{entry.outcome ? t('Decided', '已选择') : t('Needs a choice', '待选择')}</span>
       </div>
 
       <fieldset className="inline-flex flex-wrap items-stretch overflow-hidden rounded-md border border-border">
-        <legend className="sr-only">{t('Outcome', '处置结果')}</legend>
+        <legend className="sr-only">{t('Outcome', '处理方式')}</legend>
         {OUTCOMES.map((outcome) => {
           const ok = allowed.has(outcome);
           const active = entry.outcome === outcome;
@@ -141,7 +141,7 @@ function DecisionRow({ finding, entry, disabled, onChange }: {
               )}
             >
               <span className={cn(!ok && 'line-through decoration-muted-foreground/60')}>{label('decision_outcome', outcome, language)}</span>
-              <span className={cn('mono text-[10px]', active ? 'text-background/70' : 'text-muted-foreground')}>{ok ? outcome : why}</span>
+              <span className={cn('mono hidden text-[10px] sm:block', active ? 'text-background/70' : 'text-muted-foreground')}>{ok ? outcome : why}</span>
             </button>
           );
         })}
@@ -252,12 +252,12 @@ export function DecisionsTab() {
 
   const titleOf = (findingId: string) => {
     const finding = findings.find((entry) => entry.finding_id === findingId);
-    return finding ? pick(language, finding.title_zh, finding.title_en) : findingId;
+    return finding ? findingDisplayTitle(finding, language) : findingId;
   };
 
   const policyColumns: DataTableColumn<Finding>[] = [
     { key: 'finding_id', header: 'ID', render: (row) => <span className="mono text-xs">{row.finding_id}</span> },
-    { key: 'title', header: t('Title', '标题'), render: (row) => <span className="line-clamp-2 max-w-[40ch] text-xs leading-4">{pick(language, row.title_zh, row.title_en)}</span> },
+    { key: 'title', header: t('Issue', '问题'), render: (row) => <span className="line-clamp-2 max-w-[40ch] text-xs leading-4">{findingDisplayTitle(row, language)}</span> },
     { key: 'risk', header: t('Risk', '风险'), render: (row) => <RiskDot value={row.risk_level} className="text-xs" /> },
     { key: 'action', header: t('Action', '动作'), render: (row) => (row.proposed_action ? <span className="mono text-xs">{row.proposed_action}</span> : <span className="text-muted-foreground">—</span>) },
     { key: 'records', header: t('Records', '记录'), align: 'right', render: (row) => formatInt(row.affected_record_count) },
@@ -270,7 +270,7 @@ export function DecisionsTab() {
         return (
           <span className="inline-flex flex-wrap items-center gap-1.5">
             <span className="mono text-[11px] break-all">{action?.authorization_ref ?? preview}</span>
-            <span className="text-[10px] text-muted-foreground">{action ? t('from change set', '来自变更集') : t('preview', '预览')}</span>
+            <span className="text-[10px] text-muted-foreground">{action ? t('from change set', '来自执行预览') : t('preview', '授权编号')}</span>
           </span>
         );
       },
@@ -281,19 +281,19 @@ export function DecisionsTab() {
     <div className="flex flex-col gap-3 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-1.5">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <Stat k={t('need a decision', '需处置')} v={formatInt(human.length)} />
+          <Stat k={t('need a decision', '需要确认')} v={formatInt(human.length)} />
           <Stat k={t('decided', '已选择')} v={formatInt(decidedLocal)} tone="policy" />
-          <Stat k={t('unresolved', '未处置')} v={formatInt(unresolvedLocal.length)} tone={unresolvedLocal.length ? 'review' : 'muted'} />
-          <Stat k={t('policy authorized', '策略授权')} v={formatInt(policy.length)} tone="muted" />
+          <Stat k={t('unresolved', '尚未选择')} v={formatInt(unresolvedLocal.length)} tone={unresolvedLocal.length ? 'review' : 'muted'} />
+          <Stat k={t('policy authorized', '可自动处理')} v={formatInt(policy.length)} tone="muted" />
           {changed ? <Pill variant="review">{t('Unsaved changes', '有未保存修改')}</Pill> : null}
           {applied ? <Pill variant="neutral">{t('Applied · read-only', '已执行 · 只读')}</Pill> : null}
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" disabled={readOnly || decidedLocal === 0 || (!changed && !dirty)} onClick={() => void save()}>
-            {busy.putDecisions ? t('Saving', '保存中') : t('Save decisions', '保存处置')}
+            {busy.putDecisions ? t('Saving', '正在保存') : t('Save decisions', '保存选择')}
           </Button>
-          <Button size="sm" disabled={readOnly || changed || (!decisionsSaved && human.length > 0)} onClick={() => void generate()} title={changed ? t('Save decisions first', '请先保存处置') : undefined}>
-            {busy.createDryRun ? t('Generating', '生成中') : t('Generate change set', '生成变更集')}
+          <Button size="sm" disabled={readOnly || changed || (!decisionsSaved && human.length > 0)} onClick={() => void generate()} title={changed ? t('Save decisions first', '请先保存选择') : undefined}>
+            {busy.createDryRun ? t('Generating', '正在生成') : t('Generate change set', '预览执行结果')}
           </Button>
         </div>
       </div>
@@ -301,12 +301,12 @@ export function DecisionsTab() {
       {busy.putDecisions ? <p className="mono text-[11px] text-muted-foreground">PUT /v1/runs/{run.run_id}/decisions …</p> : null}
       {busy.createDryRun ? <p className="mono text-[11px] text-muted-foreground">POST /v1/runs/{run.run_id}/dry-run …</p> : null}
 
-      {saveError ? <GuardRow error={saveError} title={t('Decisions refused', '处置未被接受')} onRetry={() => void save()} /> : null}
+      {saveError ? <GuardRow error={saveError} title={t('Decisions refused', '处理选择未能保存')} onRetry={() => void save()} /> : null}
       {dryRunError ? (
-        <GuardRow error={dryRunError} title={t('Change set refused', '变更集未生成')} onRetry={() => void generate()} />
+        <GuardRow error={dryRunError} title={t('Change set refused', '执行预览未能生成')} onRetry={() => void generate()} />
       ) : null}
       {unresolvedShown.length > 0 && (dryRunError || saved) ? (
-        <InlineAlert variant="warning" title={`${unresolvedServer ? t('Saved · the server still reports unresolved findings', '已保存 · 服务端仍报告未处置的问题') : t('Unresolved findings', '未处置的问题')} · ${formatInt(unresolvedShown.length)}`}>
+        <InlineAlert variant="warning" title={`${unresolvedServer ? t('Saved · the server still reports unresolved findings', '已保存，但仍有问题没有处理方式') : t('Unresolved findings', '尚未选择处理方式')} · ${formatInt(unresolvedShown.length)}`}>
           <ul className="flex flex-col gap-0.5">
             {unresolvedShown.map((findingId) => (
               <li key={findingId}>
@@ -318,34 +318,34 @@ export function DecisionsTab() {
       ) : null}
 
       {saved && unresolvedShown.length === 0 ? (
-        <InlineAlert variant="info" title={t('Saved · every human decision is in place', '已保存 · 所有人工处置已就位')}>
-          {formatInt(Object.keys(saved.decisions).length)} {t('decisions stored for revision', '条处置已存储，对应修订')} r{run.run_revision}
-          {t('; decision_set_hash is computed by the server when the change set is generated.', '；decision_set_hash 在生成变更集时由服务端计算。')}
+        <InlineAlert variant="info" title={t('Saved · every human decision is in place', '已保存，所有问题都已选择处理方式')}>
+          {formatInt(Object.keys(saved.decisions).length)} {t('decisions stored for revision', '项选择已保存，对应版本')} r{run.run_revision}
+          {t('; decision_set_hash is computed by the server when the change set is generated.', '；生成执行预览时，服务端会记录这组选择的校验哈希。')}
         </InlineAlert>
       ) : null}
 
       {staleDryRun ? (
-        <InlineAlert variant="warning" title={t('Change set invalidated', '变更集已失效')}>
-          {t('It was built for revision', '它基于修订')} r{dryRun.run_revision}; {t('the run is now at', '运行现为')} r{run.run_revision}. {t('Generate it again.', '请重新生成。')}
+        <InlineAlert variant="warning" title={t('Change set invalidated', '原执行预览已失效')}>
+          {t('It was built for revision', '原预览对应版本')} r{dryRun.run_revision}; {t('the run is now at', '当前版本为')} r{run.run_revision}. {t('Generate it again.', '请重新生成预览。')}
         </InlineAlert>
       ) : decisionsSaved && dryRun === null && !changed ? (
-        <InlineAlert variant="info" title={t('No current change set', '当前没有变更集')}>
-          {t('Decisions are saved but no dry run exists for them (a change to decisions or a re-assessment invalidates the previous one). Generate the change set to continue.', '处置已保存，但尚无对应的预演（处置变更或重新评估会使旧变更集失效）。生成变更集以继续。')}
+        <InlineAlert variant="info" title={t('No current change set', '还没有执行预览')}>
+          {t('Decisions are saved but no dry run exists for them (a change to decisions or a re-assessment invalidates the previous one). Generate the change set to continue.', '处理方式已经保存。请先预览系统将做出的修改，再继续执行。')}
         </InlineAlert>
       ) : dryRun !== null && changed ? (
-        <InlineAlert variant="warning" title={t('Change set will be invalidated', '变更集将失效')}>
-          {t('Saving these edits changes decision_set_hash; the existing change set must be regenerated.', '保存这些修改会改变 decision_set_hash，现有变更集需要重新生成。')}
+        <InlineAlert variant="warning" title={t('Change set will be invalidated', '执行预览需要更新')}>
+          {t('Saving these edits changes decision_set_hash; the existing change set must be regenerated.', '保存本次修改后，需要重新生成执行预览。')}
         </InlineAlert>
       ) : null}
 
       <PanelSection
         id="decisions-human"
-        title={t('Human decisions', '人工处置')}
-        description={t('Outcomes are limited to allowed_outcomes; disabled ones show the policy reason.', '结果仅限 allowed_outcomes；不可选项显示策略原因。')}
+        title={t('Human decisions', '需要你确认的问题')}
+        description={t('Outcomes are limited to the release rules; disabled choices show why.', '每个问题只能选择发布规则允许的处理方式；不可选项会说明原因。')}
         flush
       >
         {human.length === 0 ? (
-          <p className="p-3 text-xs text-muted-foreground">{t('Every finding is policy-authorized; nothing needs a human decision.', '所有问题均由策略授权，无需人工处置。')}</p>
+          <p className="p-3 text-xs text-muted-foreground">{t('Every finding is policy-authorized; nothing needs a human decision.', '所有问题都已有明确规则，可以自动处理，无需人工确认。')}</p>
         ) : (
           <ul className="flex flex-col">
             {human.map((finding) => (
@@ -363,8 +363,8 @@ export function DecisionsTab() {
 
       <PanelSection
         id="decisions-policy"
-        title={t('Policy authorized', '策略授权')}
-        description={t('Executed automatically under the contract; authorization_ref = <contract id>@<version>:<finding id>.', '契约下自动执行；authorization_ref = <契约 id>@<版本>:<问题 id>。')}
+        title={t('Policy authorized', '规则允许自动处理')}
+        description={t('These actions are explicitly authorized by the release rules. The exact authorization reference remains visible for audit.', '以下处理已由发布规则明确授权，审计编号会完整保留。')}
         flush
       >
         <DataTable columns={policyColumns} rows={policy} rowKey={(row) => row.finding_id} maxHeight={320} emptyTitle={t('No policy-authorized findings', '没有策略授权的问题')} ariaLabel={t('Policy authorized findings', '策略授权的问题')} />

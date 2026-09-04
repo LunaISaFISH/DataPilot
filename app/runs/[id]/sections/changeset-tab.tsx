@@ -27,17 +27,17 @@ function staleness(run: RunDetail, dryRun: DryRunReport, t: (en: string, zh: str
       stale: true,
       reason: t(
         `Built at revision ${dryRun.run_revision}; the run is now at revision ${run.run_revision} (contract replaced, decisions cleared).`,
-        `构建于修订 ${dryRun.run_revision}；运行现为修订 ${run.run_revision}（契约已更换，处置已清空）。`,
+        `执行预览对应版本 r${dryRun.run_revision}，当前已更新为 r${run.run_revision}。发布规则已更换，原有处理选择也已清空。`,
       ),
     };
   }
   const decisionIds = Object.keys(run.decisions);
   const newer = decisionIds.filter((id) => !(id in dryRun.finding_dispositions));
   if (newer.length > 0) {
-    return { stale: true, reason: t(`Decisions changed after the dry run: ${newer.join(', ')}.`, `预演之后处置发生变化：${newer.join('、')}。`) };
+    return { stale: true, reason: t(`Decisions changed after the dry run: ${newer.join(', ')}.`, `生成预览后，以下问题的处理方式发生了变化：${newer.join('、')}。`) };
   }
   if (run.lifecycle === 'REVIEW_REQUIRED' && !run.execution) {
-    return { stale: true, reason: t('The server moved the run back to review; regenerate the change set from 处置.', '服务端已将运行退回待审查；请在处置页重新生成变更集。') };
+    return { stale: true, reason: t('The server moved the run back to review; regenerate the change set from Decisions.', '本次分析已回到待确认状态，请在“处理”中重新生成执行预览。') };
   }
   return { stale: false, reason: null };
 }
@@ -56,11 +56,11 @@ export function ChangesetTab() {
   if (!dryRun) {
     return (
       <EmptyState
-        title={t('No change set yet', '尚无变更集')}
-        description={t('Finish the decisions first: every non-policy finding needs an outcome, then 生成变更集 builds the typed action set.', '请先完成处置：每个非策略授权的发现都需要一个结果，然后用「生成变更集」构建类型化动作集。')}
+        title={t('No change set yet', '还没有执行预览')}
+        description={t('Finish the decisions first: every non-policy finding needs an outcome, then generate the execution preview.', '请先为每个需要确认的问题选择处理方式，再生成执行预览。')}
         action={
           <Button size="sm" variant="outline" onClick={() => setActiveTab('decisions')}>
-            {t('Go to decisions', '前往处置')}
+            {t('Go to decisions', '去处理问题')}
           </Button>
         }
       />
@@ -99,10 +99,10 @@ export function ChangesetTab() {
   return (
     <div className="flex flex-col gap-3">
       {stale.stale ? (
-        <InlineAlert variant="warning" title={<span className="inline-flex items-center gap-2"><Pill variant="review">{t('Stale', '已失效')}</Pill>{t('This change set no longer matches the run state', '此变更集已与运行状态不一致')}</span>}
+        <InlineAlert variant="warning" title={<span className="inline-flex items-center gap-2"><Pill variant="review">{t('Stale', '需要更新')}</Pill>{t('This change set no longer matches the run state', '这份执行预览与当前分析不一致')}</span>}
           actions={
             <Button size="sm" variant="outline" onClick={() => setActiveTab('decisions')}>
-              {t('Regenerate in decisions', '前往处置重新生成')}
+              {t('Regenerate in decisions', '重新确认并生成')}
             </Button>
           }
         >
@@ -112,14 +112,14 @@ export function ChangesetTab() {
 
       <PanelSection
         id="changeset-actions"
-        title={t('Approved action set', '已批准动作集')}
+        title={t('Approved action set', '准备执行的处理')}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>
-              {t('Revision', '修订')} <span className="mono">{dryRun.run_revision}</span>
+              {t('Revision', '分析版本')} <span className="mono">r{dryRun.run_revision}</span>
             </span>
             <span>
-              {t('Actions', '动作')} <span className="mono">{formatInt(dryRun.actions.length)}</span>
+              {t('Actions', '处理项')} <span className="mono">{formatInt(dryRun.actions.length)}</span>
             </span>
             <span>
               {t('Affected records / cells', '受影响记录 / 单元格')} <span className="mono">{formatInt(dryRun.affected_record_count)} / {formatInt(dryRun.affected_cell_count)}</span>
@@ -134,7 +134,7 @@ export function ChangesetTab() {
         actions={
           <span className="inline-flex flex-wrap items-center gap-2">
             <EqHash label={t('action set', '动作集')} value={dryRun.approved_action_set_hash} length={12} />
-            <EqHash label={t('decisions', '处置')} value={dryRun.decision_set_hash} length={12} />
+            <EqHash label={t('decisions', '处理选择')} value={dryRun.decision_set_hash} length={12} />
           </span>
         }
         flush
@@ -145,8 +145,8 @@ export function ChangesetTab() {
         </div>
         {blocked ? (
           <div className="border-t border-border px-3 py-2">
-            <InlineAlert variant="error" title={t('Blocking findings unresolved', '阻断性发现未处置')}>
-              <span className="mono">{dryRun.blocking_unresolved.join(' · ')}</span> · {t('The release stays BLOCKED until each has an outcome.', '在每个发现都有处置结果之前，发布保持阻断。')}
+            <InlineAlert variant="error" title={t('Blocking findings unresolved', '仍有影响交付的问题没有处理')}>
+              <span className="mono">{dryRun.blocking_unresolved.join(' · ')}</span> · {t('The release stays BLOCKED until each has an outcome.', '请先为每个问题选择处理方式，之后才能交付。')}
             </InlineAlert>
           </div>
         ) : null}
@@ -154,21 +154,21 @@ export function ChangesetTab() {
 
       <PanelSection
         id="changeset-preview"
-        title={t('Change preview', '变更预览')}
-        description={t('Cell-level rewrites the executor will make. Row-level actions only move records between release, quarantine and exclusion.', '执行器将进行的单元格级改写。行级动作只在发布、隔离与排除之间移动记录。')}
+        title={t('Change preview', '处理前后对比')}
+        description={t('Cell-level rewrites the executor will make. Row-level actions only move records between release, quarantine and exclusion.', '这里列出将被改写的单元格；隔离或排除只会改变交付范围，不会覆盖源文件。')}
         flush
       >
         {run.preview ? (
           <ChangePreviewTable preview={run.preview} onSelectFinding={setSelectedFindingId} />
         ) : (
-          <p className="px-3 py-3 text-xs text-muted-foreground">{t('The server returned no preview for this dry run.', '服务端未返回本次预演的预览。')}</p>
+          <p className="px-3 py-3 text-xs text-muted-foreground">{t('The server returned no preview for this dry run.', '这次没有需要展示的前后变化。')}</p>
         )}
       </PanelSection>
 
       <PanelSection
         id="changeset-apply"
-        title={t('Apply and validate', '应用并验证')}
-        description={t('POST /v1/runs/{id}/apply executes exactly this action set, then runs every validation. The request body below is what is sent; the server refuses with 409 if any hash moved.', 'POST /v1/runs/{id}/apply 精确执行此动作集，然后运行全部验证。下方即为发送的请求体；任一哈希变化时服务端以 409 拒绝。')}
+        title={t('Apply and validate', '执行处理并检查')}
+        description={t('The server executes exactly this action set, then runs every validation.', '系统只会执行上方已经确认的处理，并在生成交付结果前逐项检查。')}
       >
         <div className="flex flex-col gap-3">
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
@@ -188,7 +188,7 @@ export function ChangesetTab() {
             <dd className="mono">{run.run_revision}</dd>
             <dt className="text-muted-foreground">{t('Counts', '计数')}</dt>
             <dd className="mono">
-              {t('releasable', '可发布')} {formatInt(dryRun.eligible_record_count)} · {t('quarantined', '隔离')} {formatInt(dryRun.quarantined_record_count)} · {t('excluded', '排除')} {formatInt(dryRun.excluded_record_count)} · {t('flagged', '标记')} {formatInt(dryRun.flagged_record_count)}
+              {t('releasable', '可交付')} {formatInt(dryRun.eligible_record_count)} · {t('quarantined', '已隔离')} {formatInt(dryRun.quarantined_record_count)} · {t('excluded', '已排除')} {formatInt(dryRun.excluded_record_count)} · {t('flagged', '待复核')} {formatInt(dryRun.flagged_record_count)}
             </dd>
             <dt className="text-muted-foreground">idempotency_key</dt>
             <dd className="flex flex-wrap items-center gap-2">
@@ -208,7 +208,7 @@ export function ChangesetTab() {
           {error ? <GuardRow error={error} onRetry={error.code === 'STALE_DRY_RUN' || error.code === 'ACTION_SET_CHANGED' || error.code === 'SOURCE_ARTIFACT_CHANGED' ? undefined : () => void submit()} actions={
             error.code === 'STALE_DRY_RUN' || error.code === 'ACTION_SET_CHANGED' ? (
               <Button size="sm" variant="outline" onClick={() => setActiveTab('decisions')}>
-                {t('Regenerate change set', '重新生成变更集')}
+                {t('Regenerate change set', '重新生成执行预览')}
               </Button>
             ) : error.code === 'VALIDATION_FAILED' ? (
               <Button size="sm" variant="outline" onClick={() => setActiveTab('release')}>
@@ -219,7 +219,7 @@ export function ChangesetTab() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={() => void submit()} disabled={!canApply}>
-              {busy.applyRun ? t('Applying', '应用中') : applied ? t('Applied', '已应用') : t('Apply and validate', '应用并验证')}
+              {busy.applyRun ? t('Applying', '正在执行') : applied ? t('Applied', '处理已完成') : t('Apply and validate', '执行处理并检查')}
             </Button>
             {busy.applyRun ? (
               <span className="mono text-xs text-muted-foreground">POST /v1/runs/{runId}/apply · Idempotency-Key {idempotencyKey.slice(0, 8)}…</span>
@@ -228,16 +228,16 @@ export function ChangesetTab() {
               <span className="inline-flex flex-wrap items-center gap-2 text-xs">
                 <ReleaseStatusPill value={run.execution.release_manifest.release_status} />
                 <span className="mono text-muted-foreground">
-                  {t('validations', '验证')} {formatInt(executionSummary?.passed ?? 0)} / {formatInt(run.execution.validations.length)}
+                  {t('validations', '交付检查')} {formatInt(executionSummary?.passed ?? 0)} / {formatInt(run.execution.validations.length)}
                 </span>
                 {replayed ? <Pill variant="info" title="X-Idempotent-Replay: true">{t('Idempotent replay', '幂等重放')} · X-Idempotent-Replay</Pill> : null}
                 <Button size="sm" variant="outline" onClick={() => setActiveTab('release')}>
-                  {t('Open validation and release', '打开验证与发布')}
+                  {t('Open validation and release', '查看交付结果')}
                 </Button>
               </span>
             ) : null}
-            {!applied && stale.stale ? <span className="text-xs text-muted-foreground">{t('Disabled: change set is stale.', '已禁用：变更集已失效。')}</span> : null}
-            {!applied && !stale.stale && blocked ? <span className="text-xs text-muted-foreground">{t('Disabled: blocking findings are unresolved.', '已禁用：阻断性发现未处置。')}</span> : null}
+            {!applied && stale.stale ? <span className="text-xs text-muted-foreground">{t('Disabled: change set is stale.', '请先更新执行预览。')}</span> : null}
+            {!applied && !stale.stale && blocked ? <span className="text-xs text-muted-foreground">{t('Disabled: blocking findings are unresolved.', '仍有影响交付的问题没有处理。')}</span> : null}
           </div>
 
           {outcome ? (

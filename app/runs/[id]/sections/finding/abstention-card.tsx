@@ -16,11 +16,11 @@ export function AbstentionCard({ proposal, record }: { proposal: AIProposalSumma
     <div className="flex flex-col gap-2 rounded-md border border-border p-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <ProvenanceMark provenance={provenanceFromProposal(proposal)} showModel />
-        <Pill variant="neutral">{t('Abstained', '已弃权')}</Pill>
-        <span className="text-xs text-muted-foreground">{t('No mapping was proposed; nothing is executed from this call.', '未提出映射；此次调用不会产生任何动作。')}</span>
+        <Pill variant="neutral">{t('Abstained', '暂不判断')}</Pill>
+        <span className="text-xs text-muted-foreground">{t('No mapping was proposed; nothing is executed from this call.', 'AI 没有给出归一建议，系统不会自动改动数据。')}</span>
       </div>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-muted-foreground">{t('Abstain reason', '弃权理由')}</dt>
+        <dt className="text-muted-foreground">{t('Abstain reason', '暂不判断的原因')}</dt>
         <dd className="break-words">{proposal.abstain_reason || <span className="text-muted-foreground">—</span>}</dd>
         {explanation && explanation !== proposal.abstain_reason ? (
           <>

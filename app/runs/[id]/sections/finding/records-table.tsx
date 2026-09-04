@@ -61,9 +61,10 @@ export function RecordsTable({ runId, findingId, affectedRecordCount, highlightC
   }
   if (!records) {
     return (
-      <p className="mono text-xs text-muted-foreground">
-        GET /v1/runs/{runId}/findings/{findingId}/records?limit={RECORD_LIMIT} …
-      </p>
+      <output className="flex min-h-16 items-center gap-2 text-xs text-muted-foreground">
+        <span className="size-2 rounded-full bg-policy motion-safe:animate-pulse" aria-hidden="true" />
+        {t('Loading related records…', '正在加载相关记录…')}
+      </output>
     );
   }
 
@@ -84,8 +85,8 @@ export function RecordsTable({ runId, findingId, affectedRecordCount, highlightC
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <span>
-          {t('Showing', '显示')} <span className="mono">{formatInt(records.rows.length)}</span> / <span className="mono">{formatInt(affectedRecordCount)}</span>{' '}
-          {t('affected records', '条受影响记录')}
+          {t('Showing', '已显示')} <span className="mono">{formatInt(records.rows.length)}</span> / <span className="mono">{formatInt(affectedRecordCount)}</span>{' '}
+          {t('affected records', '条相关记录')}
         </span>
         {records.masked_columns.length > 0 ? (
           <span className="inline-flex flex-wrap items-center gap-1">

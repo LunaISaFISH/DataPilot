@@ -1,7 +1,6 @@
 'use client';
 
 import { DataTable, type DataTableColumn } from '@/components/datapilot';
-import { humanize } from '@/lib/format';
 import { pick, useLanguage } from '@/lib/language';
 import { label } from '@/lib/labels';
 import type { EvidenceSignal, EvidenceStatus } from '@/lib/types';
@@ -32,7 +31,7 @@ export function EvidenceGlyphs({ signals }: { signals: EvidenceSignal[] }) {
       {signals.map((signal, index) => (
         <span
           key={`${signal.signal}-${index}`}
-          title={`${humanize(signal.signal)} · ${label('evidence_status', signal.status, language)}\n${pick(language, signal.explanation_zh, signal.explanation_en)}`}
+          title={`${label('evidence_signal', signal.signal, language)} · ${label('evidence_status', signal.status, language)}\n${pick(language, signal.explanation_zh, signal.explanation_en)}`}
           className="inline-flex"
         >
           <StatusGlyph status={signal.status} />
@@ -59,8 +58,8 @@ export function EvidenceTable({ signals, maxHeight }: { signals: EvidenceSignal[
       render: (row) => (
         <span className="flex flex-col gap-0.5">
           <span className="flex flex-wrap items-baseline gap-x-2">
-            <span>{humanize(row.signal)}</span>
-            <span className="mono text-[11px] text-muted-foreground">{row.signal}</span>
+            <span>{label('evidence_signal', row.signal, language)}</span>
+            <span className="mono hidden text-[11px] text-muted-foreground sm:inline">{row.signal}</span>
           </span>
           <span className="text-xs leading-4 text-muted-foreground">{pick(language, row.explanation_zh, row.explanation_en)}</span>
         </span>

@@ -18,6 +18,14 @@ function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+async function waitForVisibleText(page, text, timeout = 30_000) {
+  await page.waitForFunction(
+    (expected) => document.body.innerText.split('\n').some((line) => line.trim() === expected),
+    text,
+    { timeout },
+  );
+}
+
 const web = argument('--web', 'http://127.0.0.1:3000').replace(/\/$/, '');
 const output = '.artifacts/e2e';
 await rm(output, { recursive: true, force: true });
@@ -79,7 +87,7 @@ try {
   await uci.getByRole('button', { name: 'Quick scan' }).click();
   await page.waitForURL(/\/runs\/[a-f0-9]+/, { timeout: 30_000 });
   const observationalUrl = page.url();
-  await page.getByText('Observational', { exact: true }).first().waitFor({ timeout: 30_000 });
+  await waitForVisibleText(page, 'Observational');
   const observationalMs = Date.now() - observationalStarted;
   requireCondition(observationalMs < 30_000, 'UCI observational run exceeded 30 seconds');
   console.log(`UCI observational run ready in ${observationalMs} ms`);
@@ -91,7 +99,7 @@ try {
   const ecommerce = page.locator('#samples li').filter({ hasText: 'ecommerce_orders' });
   await ecommerce.getByRole('button', { name: 'Full review' }).click();
   await page.waitForURL(/\/runs\/[a-f0-9]+/, { timeout: 30_000 });
-  await page.getByText('Review required', { exact: true }).waitFor({ timeout: 30_000 });
+  await waitForVisibleText(page, 'Review required');
   await page.getByRole('tab', { name: /Decisions/ }).click();
   await page.locator('#decisions-human').waitFor();
 
@@ -120,7 +128,7 @@ try {
   await page.screenshot({ path: `${output}/07-change-set.png`, fullPage: true });
 
   await page.getByRole('button', { name: 'Apply and validate' }).click();
-  await page.getByText('Conditional pass', { exact: true }).first().waitFor({ timeout: 30_000 });
+  await waitForVisibleText(page, 'Conditional pass');
   await page.getByRole('button', { name: 'Open validation and release' }).click();
   await page.locator('#release-validations').waitFor({ timeout: 20_000 });
   await page.getByText('14 / 14', { exact: true }).first().waitFor();
@@ -158,15 +166,39 @@ try {
   );
   await page.screenshot({ path: `${output}/10-mobile-workbench-zh.png`, fullPage: true });
 
+  await page.getByText('试用样例数据', { exact: true }).click();
+  const mobileUci = page.locator('#samples li').filter({ hasText: 'uci_online_retail' });
+  await mobileUci.getByRole('button', { name: '完整审核' }).click();
+  await page.waitForURL(/\/runs\/[a-f0-9]+/, { timeout: 30_000 });
+  await waitForVisibleText(page, '需要人工确认');
+  requireCondition(
+    (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0,
+    'mobile contracted run overflows horizontally',
+  );
+  await page.screenshot({ path: `${output}/11-mobile-review-zh.png`, fullPage: true });
+  const mobileIssue = page.locator('ul[aria-label="问题列表"] li button').first();
+  await mobileIssue.click();
+  await page.getByRole('button', { name: '关闭详情' }).waitFor();
+  await page.waitForFunction(() => document.body.innerText.includes('已显示'));
+  await page.screenshot({ path: `${output}/12-mobile-issue-detail-zh.png`, fullPage: true });
+  await page.getByRole('button', { name: '关闭详情' }).click();
+
   await page.goto(observationalUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-  await page.getByText('Observational', { exact: true }).first().waitFor({ timeout: 15_000 });
+  await waitForVisibleText(page, 'Observational', 15_000);
   await page.getByRole('button', { name: '切换到中文' }).click();
-  await page.getByText('仅观测', { exact: true }).first().waitFor({ timeout: 15_000 });
+  await waitForVisibleText(page, '快速扫描完成', 15_000);
   requireCondition(
     (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0,
     'mobile run workspace overflows horizontally',
   );
-  await page.screenshot({ path: `${output}/11-mobile-run-zh.png`, fullPage: true });
+  await page.screenshot({ path: `${output}/13-mobile-scan-zh.png`, fullPage: true });
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  requireCondition(
+    (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0,
+    '360px run workspace overflows horizontally',
+  );
+  await page.screenshot({ path: `${output}/14-mobile-scan-360-zh.png`, fullPage: true });
 
   requireCondition(runtimeErrors.length === 0, `browser runtime errors:\n${runtimeErrors.join('\n')}`);
   console.log(`OK browser flow; screenshots: ${output}`);

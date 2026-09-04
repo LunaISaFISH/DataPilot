@@ -118,8 +118,8 @@ export function ProfileTab() {
         title={t('Quality metrics', '质量指标')}
         description={
           observational
-            ? t('No contract: metrics are observational and the release status is not evaluated.', '无契约：指标仅为观测，不评估发布状态。')
-            : t('Scored over the contract scope; not-applicable metrics are excluded and weights renormalised.', '按契约范围评分；不适用的指标被排除并重新归一化权重。')
+            ? t('No contract: metrics are observational and the release status is not evaluated.', '尚未设置发布规则，本页只展示基础数据质量，不判断能否交付。')
+            : t('Scored over the contract scope; not-applicable metrics are excluded and weights renormalised.', '质量分按发布规则覆盖的范围计算；不适用的指标不会计入总分。')
         }
         actions={
           <span className="mono text-[11px] text-muted-foreground">
@@ -136,11 +136,11 @@ export function ProfileTab() {
 
       <PanelSection
         id="profile-columns"
-        title={t('Column profiles', '列画像')}
+        title={t('Column profiles', '字段概览')}
         description={`${formatInt(profile.column_count)} ${t('columns', '个字段')} · ${formatInt(profile.record_count)} ${t('records', '条记录')} · ${profile.source_encoding}`}
         flush
       >
-        <DataTable columns={columns} rows={report.column_profiles} rowKey={(row) => row.name} maxHeight={520} ariaLabel={t('Column profiles', '列画像')} />
+        <DataTable columns={columns} rows={report.column_profiles} rowKey={(row) => row.name} maxHeight={520} ariaLabel={t('Column profiles', '字段概览')} />
       </PanelSection>
 
       <div className="grid gap-3 lg:grid-cols-2">

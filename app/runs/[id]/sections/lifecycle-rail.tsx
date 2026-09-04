@@ -65,7 +65,7 @@ export function deriveRailStates(
     },
     {
       id: 'profiled',
-      zh: '已画像',
+      zh: '结构分析完成',
       en: 'Profiled',
       done: report !== null,
       file: 'report.json',
@@ -74,7 +74,7 @@ export function deriveRailStates(
     },
     {
       id: 'detected',
-      zh: '已检测',
+      zh: '问题识别完成',
       en: 'Detected',
       done: report !== null,
       file: 'report.json',
@@ -83,31 +83,31 @@ export function deriveRailStates(
     },
     {
       id: 'semantic',
-      zh: '语义已评估',
+      zh: '语义判断完成',
       en: 'Semantics assessed',
       done: semanticDone,
       file: 'ai-ledger.jsonl',
       at: semanticDone ? at('ai-ledger.jsonl', 'SEMANTIC_ANALYSIS') : null,
       detail:
         report && observational
-          ? t('Observational: no semantic scope', '仅观测：无语义范围')
+          ? t('Observational: no semantic scope', '快速扫描：不进行语义判断')
           : semanticRecords.length
-            ? `${formatInt(semanticRecords.length)} ${t('ledger calls', '次账本调用')}`
+            ? `${formatInt(semanticRecords.length)} ${t('ledger calls', '条调用记录')}`
             : null,
       notApplicable: Boolean(report) && observational && semanticRecords.length === 0,
     },
     {
       id: 'decided',
-      zh: '已处置',
+      zh: '处理方式已确认',
       en: 'Decided',
       done: decisionCount > 0 || run.dry_run !== null,
       file: 'decisions.json',
       at: decisionCount > 0 || run.dry_run ? at('decisions.json', null) : null,
-      detail: decisionCount > 0 ? `${formatInt(decisionCount)} ${t('decisions', '项处置')}` : null,
+      detail: decisionCount > 0 ? `${formatInt(decisionCount)} ${t('decisions', '项选择')}` : null,
     },
     {
       id: 'dry_run',
-      zh: '已预演',
+      zh: '执行预览完成',
       en: 'Dry run',
       done: run.dry_run !== null,
       file: 'dry-run.json',
@@ -116,16 +116,16 @@ export function deriveRailStates(
     },
     {
       id: 'applied',
-      zh: '已执行',
+      zh: '数据处理完成',
       en: 'Applied',
       done: run.execution !== null,
       file: 'execution.json',
       at: run.execution ? at('execution.json', 'APPLY') : null,
-      detail: run.execution ? `${formatInt(run.execution.release_manifest.eligible_record_count)} ${t('eligible', '可发布')}` : null,
+      detail: run.execution ? `${formatInt(run.execution.release_manifest.eligible_record_count)} ${t('eligible', '条可交付')}` : null,
     },
     {
       id: 'validated',
-      zh: '已验证',
+      zh: '交付检查完成',
       en: 'Validated',
       done: run.execution !== null,
       file: 'release-manifest.json',
@@ -143,7 +143,7 @@ export function LifecycleRail() {
   if (!run) {
     return (
       <div className="border-b border-border px-3 py-2 text-[11px] text-muted-foreground">
-        {t('Lifecycle', '生命周期')} · {t('waiting for run', '等待运行数据')}
+        {t('Lifecycle', '分析进度')} · {t('waiting for run', '等待分析数据')}
       </div>
     );
   }
@@ -152,9 +152,9 @@ export function LifecycleRail() {
   const activeIndex = failed ? -1 : states.findIndex((state) => !state.done && !state.notApplicable);
 
   return (
-    <nav aria-label={t('Lifecycle', '生命周期')} className="border-b border-border px-3 py-2">
+    <nav aria-label={t('Lifecycle', '分析进度')} className="border-b border-border px-3 py-2">
       <div className="flex items-center justify-between pb-1 text-[11px] text-muted-foreground">
-        <span>{t('Lifecycle', '生命周期')}</span>
+        <span>{t('Lifecycle', '分析进度')}</span>
         <span className="mono">{formatInt(states.filter((state) => state.done).length)} / 8</span>
       </div>
       <ol className="flex flex-col">

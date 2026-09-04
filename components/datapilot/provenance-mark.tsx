@@ -87,14 +87,14 @@ export function ProvenanceMark({ provenance, className, showModel = false }: Pro
     <Popover>
       <PopoverTrigger
         className={cn('pill cursor-pointer', ai ? 'pill-ai' : 'pill-neutral', className)}
-        aria-label={ai ? t('AI provenance', 'AI 来源信息') : t('Deterministic result', '确定性结果')}
+        aria-label={ai ? t('AI provenance', 'AI 来源信息') : t('Rule-based result', '规则判断结果')}
       >
-        {ai ? 'AI' : t('Deterministic', '确定性')}
+        {ai ? 'AI' : t('Rule-based', '规则判断')}
         {showModel && ai && provenance.model ? <span className="font-normal opacity-80">{provenance.model}</span> : null}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 text-xs">
         <div className="flex items-center justify-between">
-          <span className="font-semibold">{ai ? t('AI provenance', 'AI 来源') : t('Deterministic result', '确定性结果')}</span>
+          <span className="font-semibold">{ai ? t('AI provenance', 'AI 来源') : t('Rule-based result', '规则判断结果')}</span>
           <span className={cn('pill', ai ? 'pill-ai' : 'pill-neutral')}>
             {label('provider', provenance.provider, language)}
           </span>
@@ -118,7 +118,7 @@ export function ProvenanceMark({ provenance, className, showModel = false }: Pro
           ) : null}
           {grounding ? (
             <Row
-              k={t('Grounding', '落地校验')}
+              k={t('Grounding', '证据校验')}
               v={
                 <span className={grounding.valid ? 'text-policy' : 'text-blocker'}>
                   {grounding.valid ? t('Passed', '通过') : t('Rejected', '拦截')}
@@ -128,7 +128,7 @@ export function ProvenanceMark({ provenance, className, showModel = false }: Pro
             />
           ) : null}
           {provenance.ledger_call_id ? (
-            <Row k={t('Ledger call', '账本调用')} v={shortHash(provenance.ledger_call_id, 12)} mono />
+            <Row k={t('Ledger call', '调用记录')} v={shortHash(provenance.ledger_call_id, 12)} mono />
           ) : null}
         </dl>
         {grounding && grounding.reason_codes.length > 0 ? (
@@ -145,7 +145,7 @@ export function ProvenanceMark({ provenance, className, showModel = false }: Pro
             {provenance.reason ||
               t(
                 'Produced by deterministic rules; no model output was used.',
-                '由确定性规则生成，未使用任何模型输出。',
+                '由固定规则生成，没有使用模型输出。',
               )}
           </p>
         ) : provenance.reason ? (

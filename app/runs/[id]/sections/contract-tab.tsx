@@ -241,10 +241,10 @@ export function ContractTab() {
     <ConfirmDialog
       open={confirm !== null}
       onOpenChange={(open) => (open ? undefined : setConfirm(null))}
-      title={confirm?.mode === 'replace' ? t('Replace contract and re-analyse', '替换契约并重新分析') : t('Confirm contract and re-analyse', '确认契约并重新分析')}
+      title={confirm?.mode === 'replace' ? t('Replace contract and re-analyse', '更换发布规则并重新分析') : t('Confirm contract and re-analyse', '确认发布规则并重新分析')}
       description={t(
-        'PUT /v1/runs/{id}/contract starts a new analysis: run_revision increases by 1 and existing decisions are cleared.',
-        'PUT /v1/runs/{id}/contract 会启动新一轮分析：run_revision 加 1，已有处置将被清空。',
+        'This starts a new analysis revision and clears existing decisions.',
+        '系统会使用新规则重新分析，并清空之前保存的处理选择。',
       )}
       confirmLabel={t('Submit', '提交')}
       pending={busy.putContract}
@@ -252,8 +252,8 @@ export function ContractTab() {
     >
       <KeyValueList
         items={[
-          { key: 'rev', label: t('Current revision', '当前修订'), value: `r${run.run_revision} → r${run.run_revision + 1}`, mono: true },
-          { key: 'decisions', label: t('Decisions cleared', '将清空的处置'), value: formatInt(Object.keys(run.decisions).length), mono: true },
+          { key: 'rev', label: t('Current revision', '分析版本'), value: `r${run.run_revision} → r${run.run_revision + 1}`, mono: true },
+          { key: 'decisions', label: t('Decisions cleared', '将清空的处理选择'), value: formatInt(Object.keys(run.decisions).length), mono: true },
           { key: 'bytes', label: t('YAML size', 'YAML 大小'), value: confirm ? `${formatInt(new TextEncoder().encode(confirm.yaml).length)} B` : '—', mono: true },
         ]}
       />
@@ -265,10 +265,10 @@ export function ContractTab() {
     const yamlValue = draftYaml ?? draft?.draft_yaml ?? '';
     return (
       <div className="flex flex-col gap-3">
-        <InlineAlert variant="info" title={t('Observational mode', '仅观测模式')}>
+        <InlineAlert variant="info" title={t('Observational mode', '当前为快速扫描')}>
           {t(
             'No Data Contract is set. Without one the engine only observes: no required fields, vocabularies or business keys, so SEM/CAT/AMB/MISS/VAL detectors do not run and the release status stays NOT_EVALUATED. Let the AI draft a contract from the redacted profile, review every rule (rejected rules are shown with the grounding reason), edit the YAML, then confirm to re-analyse.',
-            '尚未设置数据契约。没有契约时引擎只做观测：没有必填字段、词表或业务键，SEM/CAT/AMB/MISS/VAL 检测器不会运行，发布状态保持“未评估”。可以让 AI 基于脱敏后的画像起草契约，逐条审阅规则（被拦下的规则会标明落地校验原因），编辑 YAML 后确认并重新分析。',
+            '尚未设置发布规则，因此系统只能展示基础质量问题，不能判断数据是否适合交付。你可以让 AI 根据已脱敏的字段概览起草规则，检查后再确认；AI 建议中证据不足的部分会被自动拦下。',
           )}
         </InlineAlert>
 
@@ -277,19 +277,19 @@ export function ContractTab() {
 
         <PanelSection
           id="contract-draft"
-          title={t('AI contract draft', 'AI 契约草案')}
+          title={t('AI contract draft', '让 AI 起草发布规则')}
           description={
             draft
               ? draft.status === 'pending'
-                ? t('Drafting in progress: watch CONTRACT_DRAFTING in the event log; polling GET /contract/draft every 2 s.', '起草进行中：事件流中可见 CONTRACT_DRAFTING；每 2 秒轮询 GET /contract/draft。')
+                ? t('Drafting in progress.', 'AI 正在根据字段概览起草规则。')
                 : draft.status === 'failed'
                   ? t('Drafting failed; the deterministic engine produced nothing to confirm.', '起草失败；没有可确认的内容。')
-                  : t('Draft returned. Accepted rules passed grounding; rejected rules are listed with their reason codes.', '草案已返回。已接受的规则通过了落地校验；被拦下的规则附带原因码。')
-              : t('No draft yet. The model only sees redacted column profiles and observed patterns; never rows.', '尚无草案。模型只会看到脱敏后的列画像与观测到的模式，不会看到任何行数据。')
+                  : t('Draft returned. Accepted rules passed grounding; rejected rules are listed with their reason codes.', '草案已经生成。通过证据校验的规则可以继续使用，被拦下的规则会说明原因。')
+              : t('No draft yet. The model only sees redacted column profiles and observed patterns; never rows.', 'AI 只会看到脱敏后的字段概览和汇总特征，不会看到原始记录。')
           }
           actions={
             <Button size="sm" onClick={() => void startDraft()} disabled={busy.draftContract || draftPending || !run.report}>
-              {busy.draftContract ? t('Requesting', '请求中') : draft ? t('Draft again', '重新起草') : t('Let AI draft a contract', '让 AI 起草契约')}
+              {busy.draftContract ? t('Requesting', '正在起草') : draft ? t('Draft again', '重新起草') : t('Let AI draft a contract', '让 AI 起草规则')}
             </Button>
           }
         >
@@ -308,7 +308,7 @@ export function ContractTab() {
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 {draft.ledger_call_id ? (
                   <span>
-                    {t('Ledger call', '账本调用')} <span className="mono">{draft.ledger_call_id}</span>
+                    {t('Ledger call', '调用记录')} <span className="mono">{draft.ledger_call_id}</span>
                   </span>
                 ) : null}
                 <span>
@@ -319,8 +319,8 @@ export function ContractTab() {
               <DataTable columns={acceptedColumns} rows={draft.accepted_rules} rowKey={(row, index) => `${ruleField(row)}-${index}`} maxHeight={280} emptyTitle={t('No accepted rules', '没有被接受的规则')} caption={t('Accepted rules', '已接受的规则')} />
               <PanelSection
                 id="contract-rejected"
-                title={t('Rules stopped by grounding', 'AI 被拦下的规则')}
-                description={t('Each rejected rule names the check that stopped it; nothing here reaches the contract.', '每条被拦下的规则都标明了拦截它的检查；这些规则不会进入契约。')}
+                title={t('Rules stopped by grounding', '未通过证据校验的规则')}
+                description={t('Each rejected rule names the check that stopped it; nothing here reaches the contract.', '每条规则都会注明被拦下的原因，也不会进入最终发布规则。')}
                 flush
               >
                 <DataTable columns={rejectedColumns} rows={draft.rejected_rules} rowKey={(row, index) => `${row.field}-${row.rule}-${index}`} maxHeight={240} emptyTitle={t('Nothing was rejected', '没有规则被拦下')} />
@@ -332,8 +332,8 @@ export function ContractTab() {
         {ready || draftYaml !== null ? (
           <PanelSection
             id="contract-yaml"
-            title={t('Contract YAML', '契约 YAML')}
-            description={t('Edit before confirming; the confirmed YAML becomes the run contract with source "drafted".', '确认前可编辑；确认后的 YAML 成为本次运行的契约（来源：AI 起草）。')}
+            title={t('Contract YAML', '发布规则 YAML')}
+            description={t('Edit before confirming; the confirmed YAML becomes the run contract with source "drafted".', '确认前可以修改；确认后系统会用这份规则重新分析数据。')}
             actions={
               <>
                 <label className="inline-flex h-7 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs hover:bg-muted">
@@ -341,7 +341,7 @@ export function ContractTab() {
                   <input type="file" accept=".yaml,.yml,text/yaml" className="sr-only" onChange={(event) => void readYamlFile(event.target.files?.[0], 'draft')} />
                 </label>
                 <Button size="sm" disabled={!yamlValue.trim() || busy.putContract} onClick={() => setConfirm({ yaml: yamlValue, mode: 'draft' })}>
-                  {t('Confirm contract and re-analyse', '确认契约并重新分析')}
+                  {t('Confirm contract and re-analyse', '确认规则并重新分析')}
                 </Button>
               </>
             }
@@ -352,8 +352,8 @@ export function ContractTab() {
         ) : (
           <PanelSection
             id="contract-upload"
-            title={t('Or supply a contract YAML', '或直接提供契约 YAML')}
-            description={t('Paste or load a v1/v2 contract; the server validates it and re-analyses.', '粘贴或载入 v1/v2 契约；服务端校验后重新分析。')}
+            title={t('Or supply a contract YAML', '或直接提供发布规则 YAML')}
+            description={t('Paste or load a v1/v2 contract; the server validates it and re-analyses.', '粘贴或载入规则文件；系统校验通过后会重新分析。')}
             actions={
               <label className="inline-flex h-7 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs hover:bg-muted">
                 {t('Load YAML file', '载入 YAML 文件')}
@@ -382,7 +382,7 @@ export function ContractTab() {
         id="contract-summary"
         title={
           <span className="inline-flex flex-wrap items-center gap-2">
-            {asString(parsed.id) ?? contractInfo?.id ?? t('Contract', '契约')}
+            {asString(parsed.id) ?? contractInfo?.id ?? t('Contract', '发布规则')}
             <span className="mono text-xs text-muted-foreground">@{asString(parsed.version) ?? contractInfo?.version ?? '—'}</span>
             <Pill variant={contract.source === 'drafted' ? 'ai' : 'policy'}>{label('contract_source', contract.source, language)}</Pill>
           </span>
@@ -390,9 +390,9 @@ export function ContractTab() {
         description={pick(language, asString(parsed.title_zh), asString(parsed.title_en)) || undefined}
         actions={
           <>
-            <HashChip value={contract.hash} label={t('contract', '契约')} length={16} />
+            <HashChip value={contract.hash} label={t('contract', '规则')} length={16} />
             <Button size="sm" variant="outline" onClick={() => setReplacing((value) => !value)} disabled={run.lifecycle === 'APPLIED'}>
-              {replacing ? t('Cancel replace', '取消替换') : t('Replace contract', '替换契约')}
+              {replacing ? t('Cancel replace', '取消更换') : t('Replace contract', '更换规则')}
             </Button>
           </>
         }
@@ -404,13 +404,13 @@ export function ContractTab() {
             { key: 'bk', label: t('Business key', '业务键'), value: businessKey.length ? businessKey.join(', ') : '—', mono: true },
             {
               key: 'amb',
-              label: t('Ambiguity registry', '多义词登记'),
+              label: t('Ambiguity registry', '多义词清单'),
               value: ambiguity.length ? ambiguity.map(([column, tokens]) => `${column}: ${Array.isArray(tokens) ? tokens.length : 0}`).join(' · ') : '—',
               mono: true,
             },
             {
               key: 'auto',
-              label: t('Auto authorization', '自动授权'),
+              label: t('Auto authorization', '允许自动处理'),
               value: auto.length ? auto.filter(([, enabled]) => enabled === true).map(([name]) => name).join(', ') || t('none', '无') : '—',
               mono: true,
             },
@@ -425,8 +425,8 @@ export function ContractTab() {
       {replacing ? (
         <PanelSection
           id="contract-replace"
-          title={t('Replace contract', '替换契约')}
-          description={t('Submitting re-analyses the same source: revision +1, decisions cleared, dry run invalidated.', '提交后对同一源文件重新分析：修订 +1，处置清空，预演失效。')}
+          title={t('Replace contract', '更换发布规则')}
+          description={t('Submitting re-analyses the same source: revision +1, decisions cleared, dry run invalidated.', '提交后会重新分析同一份源文件，之前的处理选择和执行预览将被清空。')}
           actions={
             <>
               <label className="inline-flex h-7 cursor-pointer items-center rounded-md border border-border bg-card px-2 text-xs hover:bg-muted">
@@ -443,7 +443,7 @@ export function ContractTab() {
           <YamlEditor value={replaceYaml ?? contract.yaml} onChange={setReplaceYaml} minRows={16} maxHeight={560} />
         </PanelSection>
       ) : (
-        <PanelSection id="contract-view" title={t('Contract YAML', '契约 YAML')} description={t('Read-only view of the stored contract.', '已存储契约的只读视图。')}>
+        <PanelSection id="contract-view" title={t('Contract YAML', '发布规则 YAML')} description={t('Read-only view of the stored contract.', '查看当前生效的规则文件。')}>
           <YamlEditor value={contract.yaml} readOnly minRows={12} maxHeight={560} />
         </PanelSection>
       )}
@@ -463,7 +463,7 @@ function LedgerNote({ ledgerCallId }: { ledgerCallId: string | null }) {
   return (
     <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
       <ProvenanceMark provenance={provenanceFromRecord(record)} showModel />
-      {t('This contract was drafted by the model and confirmed by a human.', '本契约由模型起草，经人工确认。')}
+      {t('This contract was drafted by the model and confirmed by a human.', '这份发布规则由 AI 起草，并经过人工确认。')}
     </p>
   );
 }

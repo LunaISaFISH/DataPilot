@@ -45,7 +45,7 @@ export function ApiLogDrawer() {
   const rows = [...entries].reverse();
 
   return (
-    <section className="shrink-0 border-t border-border bg-card" aria-label={t('API log', 'API 日志')}>
+    <section className="hidden shrink-0 border-t border-border bg-card md:block" aria-label={t('API log', 'API 日志')}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

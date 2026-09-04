@@ -204,18 +204,18 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
     const decisions: TabAvailability = !hasReport
       ? noReport
       : run.lifecycle === 'OBSERVATIONAL'
-        ? { locked: true, reason: t('Observational mode: set a contract before deciding', '仅观测模式：需先设置契约再处置') }
+        ? { locked: true, reason: t('Quick scan: add release rules before choosing how to handle issues', '快速扫描只展示问题；设置发布规则后才能选择处理方式') }
         : running
           ? noReport
           : open;
     const changeset: TabAvailability =
       run.dry_run !== null
         ? open
-        : { locked: true, reason: t('No change set yet; generate it from 处置', '尚未生成变更集，请在处置页生成') };
+        : { locked: true, reason: t('No execution preview yet; generate it from Decisions', '请先在“处理”中确认问题并生成执行预览') };
     const release: TabAvailability =
       run.execution !== null || run.dry_run !== null
         ? open
-        : { locked: true, reason: t('Requires a change set first', '需先生成变更集') };
+        : { locked: true, reason: t('Requires an execution preview first', '请先生成执行预览') };
     return {
       profile: hasReport ? open : noReport,
       contract: running ? { locked: true, reason: t('Analysis in progress', '分析进行中') } : open,
@@ -329,7 +329,22 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
           <section className="min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-black/8 bg-white shadow-[0_12px_36px_rgba(16,35,30,0.04)]">
             <WorkspaceTabs />
           </section>
-          <aside className={cn('min-h-0 overflow-y-auto rounded-2xl border border-black/8 bg-white shadow-[0_12px_36px_rgba(16,35,30,0.04)] xl:block', selectedFindingId ? 'block' : 'hidden')}>
+          {selectedFindingId ? (
+            <button
+              type="button"
+              aria-label={t('Close issue details', '关闭问题详情')}
+              className="fixed inset-x-0 bottom-0 top-[calc(var(--shell-header-height)+var(--shell-status-height))] z-40 bg-foreground/20 backdrop-blur-[1px] xl:hidden"
+              onClick={() => setSelectedFindingId(null)}
+            />
+          ) : null}
+          <aside
+            className={cn(
+              'min-h-0 overflow-y-auto rounded-2xl border border-black/8 bg-white',
+              selectedFindingId
+                ? 'fixed inset-x-3 bottom-3 top-[calc(var(--shell-header-height)+var(--shell-status-height)+0.75rem)] z-50 block shadow-2xl xl:static xl:z-auto xl:shadow-[0_12px_36px_rgba(16,35,30,0.04)]'
+                : 'hidden shadow-[0_12px_36px_rgba(16,35,30,0.04)] xl:block',
+            )}
+          >
             {selectedFindingId ? <FindingInspector findingId={selectedFindingId} /> : <AiSupervisionRail />}
           </aside>
         </div>

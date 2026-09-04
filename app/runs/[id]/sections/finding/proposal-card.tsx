@@ -37,7 +37,7 @@ export function ProposalCard({ finding, record }: { finding: Finding; record: AI
     <div className="flex flex-col gap-2 rounded-md border border-border p-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <ProvenanceMark provenance={provenanceFromProposal(proposal)} showModel />
-        <Pill variant={proposal.grounding.valid ? 'policy' : 'blocker'}>{proposal.grounding.valid ? t('Grounded', '已接地') : t('Rejected', '已拒绝')}</Pill>
+        <Pill variant={proposal.grounding.valid ? 'policy' : 'blocker'}>{proposal.grounding.valid ? t('Grounded', '证据校验通过') : t('Rejected', '建议已拦截')}</Pill>
         <span className="text-xs text-muted-foreground">
           {formatInt(rows.length)} {t('sources', '来源值')} → {formatInt(targets.size)} {t('targets', '目标值')}
         </span>
@@ -65,7 +65,7 @@ export function ProposalCard({ finding, record }: { finding: Finding; record: AI
             <tfoot>
               <tr>
                 <td colSpan={2} className="text-[11px] text-muted-foreground">
-                  {countSource === 'details' ? t('counts: report details.observed_counts', '计数来源：报告 details.observed_counts') : t('counts: recorded request candidate_counts', '计数来源：记录的请求 candidate_counts')}
+                  {countSource === 'details' ? t('counts: report details.observed_counts', '计数来自分析报告') : t('counts: recorded request candidate_counts', '计数来自 AI 调用记录')}
                 </td>
                 <td className="cell-num text-xs">{formatInt(total)}</td>
               </tr>
