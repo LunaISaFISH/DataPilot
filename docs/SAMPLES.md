@@ -153,10 +153,15 @@ pseudonymous number), so no column is withheld.
 | `UnitPrice` | `type: number`, `min: 0.01` | non-positive prices (adjustments, samples) | 273 | `VAL-UnitPrice` |
 | `InvoiceNo` | `pattern: "^C?\d{6}$"` | none | 0 | — |
 
-Release with `demo_decisions` and the deterministic provider: 25,320 eligible, 16,674
-quarantined, 487 excluded (13 of the 500 duplicates are also quarantined), 42,481 cells changed
-(date standardisation), `CONDITIONAL_PASS`; the baseline validity score is low (74) because the
-dates do not yet match the declared format and rises after standardisation.
+Release with `demo_decisions` and the deterministic provider (which deliberately creates no
+semantic mapping): 25,320 eligible, 16,674 quarantined, 487 excluded (13 of the 500 duplicate
+members are also quarantined), and 42,481 date cells changed, `CONDITIONAL_PASS`.
+
+The verified booth replay records the grounded AI proposal `EIRE → Ireland` and its human
+approval. That run has 25,653 eligible, 16,341 quarantined, 487 release-excluded, 42,884 affected
+cells, 14/14 validations, and fixed-scope quality 89.43 → 95.92. These values are exported from
+the applied run into `lib/data/uci-online-retail-replay.json`; they are not interchangeable with
+the deterministic-provider baseline above.
 
 Observational mode: `DUP-EXACT` 500 only (`InvoiceDate` is not inferred as a date column
 without the contract's format).

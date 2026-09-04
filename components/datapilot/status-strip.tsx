@@ -3,7 +3,6 @@
 import { ServerCog } from 'lucide-react';
 import { useState } from 'react';
 
-import { LanguageToggle } from '@/components/language-toggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -54,7 +53,7 @@ function Item({ children, className, title }: { children: React.ReactNode; class
   );
 }
 
-/** Top status strip: API connectivity, engine version, AI provider/model, sample count, language. */
+/** Compact operational strip, only mounted on live-analysis routes. */
 export function StatusStrip({ className, intervalMs }: StatusStripProps) {
   const { t, language } = useLanguage();
   const { health, error, loading, apiBase, apiBaseSource } = useHealth(intervalMs);
@@ -106,7 +105,7 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
   return (
     <div
       className={cn(
-        'flex h-(--shell-strip-height) items-stretch justify-between border-b border-border bg-card',
+        'flex h-(--shell-status-height) items-stretch justify-between border-b border-border bg-[#f7f9f7]',
         className,
       )}
       aria-label={t('Engine status', '引擎状态')}
@@ -122,7 +121,7 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
               <span className="text-muted-foreground">{t('Engine', '引擎')}</span>
               <span className="mono">{health.engine_version}</span>
             </Item>
-            <Item>
+            <Item className="hidden md:inline-flex">
               {aiLive ? (
                 <>
                   <span className="pill pill-ai">AI</span>
@@ -143,7 +142,7 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
           </>
         ) : null}
       </div>
-      <div className="flex items-center gap-2 px-2">
+      <div className="flex items-center px-2">
         <Popover
           open={settingsOpen}
           onOpenChange={(open) => {
@@ -156,13 +155,13 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
           }}
         >
           <PopoverTrigger
-            className="inline-flex h-8 min-w-0 max-w-[42vw] items-center gap-1.5 rounded-md border border-border bg-card px-2 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-7 sm:max-w-64"
+            className="inline-flex size-8 items-center justify-center rounded-md text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-7 sm:w-auto sm:max-w-64 sm:justify-start sm:gap-1.5 sm:border sm:border-border sm:bg-card sm:px-2"
             aria-label={t('Configure backend API', '配置后端 API')}
             title={apiBase ?? undefined}
           >
             <ServerCog aria-hidden="true" className="size-3.5 shrink-0" />
-            <span className="shrink-0">{t('Backend', '后端')}</span>
-            <span className="mono min-w-0 truncate text-[10px] text-muted-foreground">{apiBase}</span>
+            <span className="hidden shrink-0 sm:inline">{t('Backend', '后端')}</span>
+            <span className="mono hidden min-w-0 truncate text-[10px] text-muted-foreground lg:inline">{apiBase}</span>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[min(22rem,calc(100vw-1rem))] gap-3 p-3">
             <PopoverHeader>
@@ -242,7 +241,6 @@ export function StatusStrip({ className, intervalMs }: StatusStripProps) {
             </form>
           </PopoverContent>
         </Popover>
-        <LanguageToggle />
       </div>
     </div>
   );

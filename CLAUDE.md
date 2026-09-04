@@ -19,6 +19,8 @@ make demo-prewarm
 node scripts/e2e_smoke.mjs --web http://localhost:3000
 ```
 
+The booth route is `/demo`; it must remain API-independent and visibly labelled as a verified replay. The real upload and sample workflow is `/workbench`.
+
 Run the smallest relevant test while editing, then `make test` at a milestone. Python is strict-mypy and Ruff clean; frontend uses oxlint and a production vinext build. Keep shared pytest setup in `conftest.py` rather than copying setup among test files.
 
 ## Non-negotiable truth boundaries
@@ -33,7 +35,7 @@ Run the smallest relevant test while editing, then `make test` at a milestone. P
 
 ## AI cost discipline
 
-Use replay/fake providers for normal tests. Use cached public sample requests for rehearsal. Make a live Anthropic call only when validating provider integration or output quality, and record it in the ledger. `claude-opus-5` is required by BUILD-SPEC; keep effort low except contract drafting, and rely on the public persistent daily cap.
+Use replay/fake providers for normal tests. Use cached public sample requests for rehearsal. Make a live Anthropic call only when validating provider integration or output quality, and record it in the ledger. The live default is `claude-haiku-4-5-20251001`; use a more expensive model only for an explicitly requested quality check, and rely on the public persistent daily cap.
 
 ## Deployment and git
 

@@ -6,10 +6,14 @@
   deterministic rules; labelled ``deterministic`` or ``verified-replay``.
 * :class:`TimeoutProvider` — test/red-team helper that always times out (fail-closed path).
 
-Live API facts verified against ``anthropic==1.3.0`` on 2026-09-04 with ``claude-opus-5``:
+Live API facts verified against ``anthropic==1.3.0`` on 2026-09-04. The deployed model is an
+explicit, dated low-cost model id so ledger provenance remains stable and auditable:
 ``client.beta.messages.create`` accepted ``betas=["server-side-fallback-2026-07-01"]`` together
-with ``fallbacks="default"``, ``output_config={"format": {...json_schema...}, "effort": ...}``
-and a per-call ``timeout``; ``temperature``/``top_p``/``thinking`` are deliberately omitted.
+with ``fallbacks="default"``, structured ``output_config.format`` and a per-call ``timeout``.
+The ``effort`` and server-side ``fallbacks`` keys are sent only to model families that support
+them; Haiku 4.5 rejects both at request validation, so the application keeps its own fail-closed
+fallback for that family.
+``temperature``/``top_p``/``thinking`` are deliberately omitted.
 The structured-output schema validator rejects ``maxItems`` on arrays ("property 'maxItems' is
 not supported"), so list bounds are enforced by the pydantic output models instead.
 """
@@ -35,7 +39,7 @@ from datapilot.contracts.models import AIStatus, AITask, ProviderName
 from datapilot.serialization import atomic_write_json, canonical_json
 from datapilot.storage import utc_now_iso
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 DETERMINISTIC_MODEL = "deterministic-rules-1.0"
 SERVER_SIDE_FALLBACK_BETA = "server-side-fallback-2026-07-01"
 AI_MODES = ("auto", "off", "replay")
@@ -308,6 +312,16 @@ def _usage_int(usage: Any, key: str) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
+def _supports_effort(model: str) -> bool:
+    """Anthropic's Haiku family rejects ``output_config.effort`` at request validation."""
+    return "haiku" not in model.casefold()
+
+
+def _supports_server_side_fallback(model: str) -> bool:
+    """The low-cost Haiku family relies on DataPilot's own deterministic fallback."""
+    return "haiku" not in model.casefold()
+
+
 class AnthropicProvider:
     """Official SDK adapter. Credentials come from the SDK's own resolution; never passed."""
 
@@ -347,6 +361,11 @@ class AnthropicProvider:
         max_tokens: int,
         timeout_s: float,
     ) -> dict[str, Any]:
+        output_config: dict[str, Any] = {
+            "format": {"type": "json_schema", "schema": schema},
+        }
+        if _supports_effort(self._model):
+            output_config["effort"] = effort
         kwargs: dict[str, Any] = {
             "model": self._model,
             "max_tokens": max_tokens,
@@ -354,13 +373,10 @@ class AnthropicProvider:
                 {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
             ],
             "messages": [{"role": "user", "content": user_text}],
-            "output_config": {
-                "format": {"type": "json_schema", "schema": schema},
-                "effort": effort,
-            },
+            "output_config": output_config,
             "timeout": timeout_s,
         }
-        if self.use_server_side_fallback:
+        if self.use_server_side_fallback and _supports_server_side_fallback(self._model):
             kwargs["betas"] = [SERVER_SIDE_FALLBACK_BETA]
             kwargs["fallbacks"] = "default"
         return kwargs

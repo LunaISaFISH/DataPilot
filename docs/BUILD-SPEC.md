@@ -14,9 +14,10 @@ Deterministic rules execute · Validations gate release.**
 
 Non-negotiables:
 
-1. Every number on screen comes from the API. No `setTimeout` fake progress, no hardcoded
-   result strings, no client-side simulation of engine work.
-2. The AI (Anthropic, official Python SDK, `claude-opus-5`) is in the live loop for three
+1. Every result number on screen comes from the API or a snapshot produced and verified from
+   API artifacts by the repository exporter. No hand-authored result strings, `setTimeout` fake
+   progress, or client-side simulation of engine work.
+2. The AI (Anthropic, official Python SDK, `claude-haiku-4-5-20251001`) is in the live loop for three
    bounded tasks: semantic mapping proposals, Data Contract drafting, and release brief
    narration. It never receives row-level data, never sees sensitive values, never produces
    code, and every output passes a deterministic grounding validator before it is shown.
@@ -31,8 +32,9 @@ Non-negotiables:
    detector, metric, or validation may hardcode a fixture column name or value.
 7. Chinese is the primary UI language; English is secondary. Engine output carries both
    `*_zh` and `*_en` human strings so the UI never hardcodes finding titles.
-8. The static replay at `/demo/clinical-nlp` is kept as a clearly labelled offline fallback,
-   restyled to match, and is not the default entry.
+8. `/demo` is the recruitment-booth default: a clearly labelled, privacy-minimised replay of
+   one real UCI run. It must load without the API or an LLM call. `/workbench` keeps all live
+   functionality; `/demo/clinical-nlp` remains as a compatibility fallback.
 
 Stack is fixed: FastAPI 0.141 + Polars 1.44 + Pydantic 2.13 strict (Python 3.12); vinext
 1.0.0-beta.9 (Next App Router compatible on Vite 8) + React 19 + Tailwind 4 + shadcn/base-ui
@@ -309,7 +311,7 @@ prints a table).
 resolve credentials (env `ANTHROPIC_API_KEY` or an `ant auth login` profile) →
 `AnthropicProvider`, else `DeterministicProvider`. `off` → deterministic. `replay` →
 deterministic labelled `verified-replay` (used by golden generation and tests).
-`ANTHROPIC_MODEL` default `claude-opus-5`. Remove `ANTHROPIC_QUALITY_MODEL` everywhere.
+`ANTHROPIC_MODEL` default `claude-haiku-4-5-20251001`. Remove `ANTHROPIC_QUALITY_MODEL` everywhere.
 
 ### 5.2 AnthropicProvider (official SDK, verified against `anthropic==1.3.0`)
 ```python
@@ -319,20 +321,20 @@ response = client.beta.messages.create(
     max_tokens=max_tokens,                       # 2000 semantic, 6000 draft, 2000 brief
     system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
     messages=[{"role": "user", "content": user_json_text}],
-    output_config={"format": {"type": "json_schema", "schema": schema}, "effort": effort},
-    betas=["server-side-fallback-2026-07-01"],
-    fallbacks="default",
+    output_config={"format": {"type": "json_schema", "schema": schema}},
 )
 ```
 No `temperature`/`top_p` (rejected by Opus 5). No `thinking` parameter (adaptive is the
-default). `effort`: `low` for semantic and brief, `medium` for contract drafting. Check
+default). For model families that support it, add `effort`: `low` for semantic and brief,
+`medium` for contract drafting. Opus can also receive the server-side fallback beta and
+`fallbacks="default"`; Haiku 4.5 rejects both `effort` and `fallbacks`, so omit them and rely on
+DataPilot's existing fail-closed cache/deterministic fallback. This capability split was verified
+with the live API on 2026-09-04. Check
 `response.stop_reason == "refusal"` before reading content → record status `refusal` and fall
 back. Parse the first text block with `json.loads`, validate with the strict pydantic output
 model. Record `response.model`, `response.usage.input_tokens/output_tokens/cache_read_input_tokens`,
-`response._request_id`. Timeouts: semantic 25 s, draft 75 s, brief 30 s. If the beta header or
-`fallbacks` is rejected by the live API during implementation, drop them and note it in
-`ai/provider.py`; the smoke check `scripts/llm_smoke.py` must pass against the real API with the
-key present in the environment.
+`response._request_id`. Timeouts: semantic 25 s, draft 75 s, brief 30 s. The smoke check
+`scripts/llm_smoke.py` must pass against the real API with the key present in the environment.
 
 ### 5.2b Response cache and live re-run
 - Every successful live response is cached at `<DATAPILOT_DATA_DIR>/ai-cache/<task>/<input_hash>.json`
@@ -503,16 +505,21 @@ from the regenerated report.
 
 ## 9. Frontend
 
-### 9.1 Visual direction — "run console, not brochure"
-The current UI reads as a marketing mockup: big hero copy, three cards, one button, a
-phone-width wizard. The new UI is a desktop governance console an engineer would use at 9am:
-- App shell with a left sidebar (工作台 / 运行记录 / 关于引擎 / 离线回放), a top status strip
-  (API 已连接 · 引擎 0.2.0 · AI claude-opus-5 已就绪 / 确定性回退 · 样例 3 · 数据目录 local),
-  the language toggle, and a 投影模式 toggle (zoom 125%, stronger contrast). Sidebar collapses
-  under 1024px; design for 1280–1920 first.
-- Dense layout: 13px body in data regions, 12px mono for ids/hashes/numbers, 8px rhythm,
-  1px borders, radius ≤ 6px, no drop shadows, no gradient or tinted hero cards, no
-  decorative icons, no emoji, no exclamation marks, no marketing adjectives.
+### 9.1 Visual direction — "quiet release dashboard"
+The interface must feel like one coherent product, not a wall of generic AI components or a
+presentation deck:
+- One compact top header at every breakpoint; no permanent sidebar. Primary navigation is
+  演示 / 分析 / 运行 plus the language switch. Operational status is shown only on live routes.
+- Use a constrained content width, warm neutral canvas, white working surfaces, dark ink and
+  one emerald accent. Titles stay at dashboard scale (46px maximum on the landing page; 30px
+  maximum inside the demo), with little decoration and no fake activity.
+- The booth demo presents one major decision surface at a time. The live workbench initially
+  shows one upload surface; bundled samples are collapsed until requested. Dense engineering
+  tables remain available in run details, history and artifacts rather than filling the entry.
+- Mobile is first-class at 390px and supported at 360px. The run console hides auxiliary
+  lifecycle/log/AI rails below wide desktop sizes so core findings and decisions appear first.
+- Data regions retain 13px body, tabular numerals, 1px rules, explicit text labels for risk,
+  and copyable hashes. Motion never simulates analysis.
 - Real tables everywhere data is tabular (column profiles, findings, ledger, validations,
   change ledger, run history, artifacts). Sticky headers, right-aligned numbers, tabular figures.
 - Hashes are first-class objects: `HashChip` shows `sha256:` + first 8 + `…` + last 6 in mono,
@@ -528,11 +535,13 @@ phone-width wizard. The new UI is a desktop governance console an engineer would
   celebration screens. Loading states show the real request in flight.
 
 ### 9.2 Pages
-- `/` 工作台: top = 新建发布评估 (drag-drop CSV + optional contract YAML; shows name, size,
-  detected encoding hint; 开始分析 → POST → navigate to `/runs/{id}`) beside the three sample
-  cards (rows/cols/story, buttons 带契约分析 / 仅观测); below = 最近运行 table (run id, source,
-  hash short, contract, lifecycle, release status, created). No hero copy; one 13px sentence of
-  positioning under the page title. 重置演示 button (bulk cleanup) in the table header.
+- `/`: concise product entry with two explicit paths: the instant verified `/demo` and the real
+  `/workbench`. Its proof card reads the same exported UCI snapshot as the demo.
+- `/demo`: four manual chapters (facts → supervised AI proposal → policy/human decisions →
+  verified release) from `lib/data/uci-online-retail-replay.json`. It never calls `/health`,
+  `/v1`, or a model, always says it is a replay, and exposes source/audit hashes.
+- `/workbench`: real CSV + optional contract upload. Bundled live samples are collapsed by
+  default; their 完整审核 / 快速扫描 buttons still call the real API. Run history lives at `/runs`.
 - `/runs`: full history table with delete and 重跑同一文件 actions.
 - `/runs/[id]` **the console** (three panes + bottom drawer, everything stays visible):
   - Header strip: source name · run id chip · revision · encoding badge · contract pill ·
@@ -592,8 +601,7 @@ phone-width wizard. The new UI is a desktop governance console an engineer would
 - `/engine` 关于引擎: invariants list, inline SVG of the AI boundary (data → redaction →
   model → grounding → policy → human → executor → validation → verify), allowed action table,
   validation table, grounding reason codes, ADR summaries, quality gates with true numbers.
-- `/demo/clinical-nlp`: same shell and components, badge `离线回放 · 非实时`, restyled; keep as
-  fallback only.
+- `/demo/clinical-nlp`: compatibility replay; `/demo` is the default booth experience.
 
 ### 9.3 Client
 `lib/api.ts`: `getHealth, listSamples, createRun(file, policy?), createRunFromSample,

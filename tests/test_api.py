@@ -7,14 +7,20 @@ against an isolated data directory per test.
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import pytest
+from datapilot.ai import get_runtime
+from datapilot.ai.provider import configured_model
 from datapilot.api.main import Settings, create_app
 from datapilot.contracts.models import RunReport
 from datapilot.governance import demo_decisions
+from datapilot.pipeline import Pipeline
+from datapilot.storage import RunStore
 from fastapi.testclient import TestClient
 
 SMALL_CSV = (
@@ -358,6 +364,9 @@ def test_upload_without_contract_is_observational(client: TestClient) -> None:
     assert detail["report"]["release_status"] == "NOT_EVALUATED"
     assert detail["report"]["contract"]["source"] == "baseline"
     assert detail["report"]["profile"]["record_count"] == 4
+    assert client.get(f"/v1/runs/{run_id}/ai-ledger").json() == []
+    events = client.get(f"/v1/runs/{run_id}/events")
+    assert "observational_no_contract" in events.text
 
     refused = client.post(f"/v1/runs/{run_id}/dry-run")
     assert refused.status_code == 409
@@ -371,6 +380,74 @@ def test_upload_without_contract_is_observational(client: TestClient) -> None:
     assert [item["run_id"] for item in listed] == [run_id]
     assert listed[0]["lifecycle"] == "OBSERVATIONAL"
     assert listed[0]["record_count"] == 4
+
+
+def test_run_detail_recovers_terminal_report_without_events(
+    client: TestClient, data_dir: Path
+) -> None:
+    created = client.post("/v1/runs", files={"file": ("sample.csv", SMALL_CSV, "text/csv")})
+    run_id = created.json()["run_id"]
+    store = RunStore(data_dir / "runs")
+    store.remove(run_id, "events.jsonl")
+    store.update_meta(run_id, lifecycle="RUNNING", record_count=None, column_count=None)
+
+    detail = client.get(f"/v1/runs/{run_id}")
+    events = client.get(f"/v1/runs/{run_id}/events")
+
+    assert detail.status_code == 200
+    assert detail.json()["lifecycle"] == "OBSERVATIONAL"
+    assert detail.json()["report"]["release_status"] == "NOT_EVALUATED"
+    assert events.status_code == 200
+    assert events.text == ""
+
+
+def test_observational_executor_is_not_starved_by_model_work(tmp_path: Path) -> None:
+    started = threading.Event()
+    release = threading.Event()
+    observational_done = threading.Event()
+    store = RunStore(tmp_path / "runs")
+
+    class BlockingContractPipeline(Pipeline):
+        def run_analysis(self, run_id: str) -> None:
+            if run_id == "contracted":
+                started.set()
+                release.wait(timeout=5)
+                return
+            super().run_analysis(run_id)
+            observational_done.set()
+
+    store.create("contracted", SMALL_CSV, "contracted.csv", SMALL_CONTRACT, None)
+    store.create("observational", SMALL_CSV, "observational.csv", None, None)
+    with (
+        ThreadPoolExecutor(max_workers=1) as model_executor,
+        ThreadPoolExecutor(max_workers=1) as observational_executor,
+    ):
+        pipeline = BlockingContractPipeline(
+            store,
+            get_runtime(store, mode="replay"),
+            sync=False,
+            executor=model_executor,
+            observational_executor=observational_executor,
+        )
+        try:
+            assert pipeline.submit_analysis("contracted") is True
+            assert started.wait(timeout=2)
+            assert pipeline.submit_analysis("observational") is True
+            assert observational_done.wait(timeout=2)
+        finally:
+            release.set()
+
+    assert store.read_meta("observational")["lifecycle"] == "OBSERVATIONAL"
+    assert store.read_ledger("observational") == []
+
+
+def test_default_anthropic_model_is_dated_low_cost_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
+
+    assert configured_model() == "claude-haiku-4-5-20251001"
+    assert Settings(data_dir=Path("unused")).ai_daily_call_cap == 40
 
 
 def test_empty_upload_is_rejected(client: TestClient) -> None:

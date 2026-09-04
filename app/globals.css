@@ -71,7 +71,8 @@
     'Noto Sans CJK SC', sans-serif;
   --font-mono:
     'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, 'Noto Sans Mono CJK SC', monospace;
-  --shell-sidebar-width: 208px;
+  --shell-header-height: 58px;
+  --shell-status-height: 38px;
   --shell-strip-height: 44px;
 }
 

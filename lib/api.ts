@@ -686,6 +686,8 @@ export function subscribeEvents(
   let lastSeq = options.after ?? 0;
   let source: EventSource | null = null;
   let errorCount = 0;
+  let openedOnce = false;
+  let pollingStarted = false;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   const pollInterval = options.pollIntervalMs ?? 2000;
 
@@ -720,7 +722,8 @@ export function subscribeEvents(
   };
 
   const startPolling = () => {
-    if (closed) return;
+    if (closed || pollingStarted) return;
+    pollingStarted = true;
     logSse(`polling getRun every ${pollInterval} ms`);
     handlers.onOpen?.('polling');
     const tick = async () => {
@@ -757,11 +760,11 @@ export function subscribeEvents(
     const es = new EventSource(url);
     source = es;
     es.onopen = () => {
-      errorCount = 0;
+      openedOnce = true;
       logSse('open');
       handlers.onOpen?.('sse');
     };
-    es.onmessage = (message: MessageEvent<string>) => {
+    const handleMessage = (message: MessageEvent<string>) => {
       if (!message.data) return;
       let parsed: unknown;
       try {
@@ -771,9 +774,12 @@ export function subscribeEvents(
       }
       if (isRunEvent(parsed)) emit(parsed);
     };
+    // FastAPI emits named `run_event` messages. Keep `onmessage` for older/default-event APIs.
+    es.onmessage = handleMessage;
+    es.addEventListener('run_event', handleMessage as EventListener);
     es.onerror = () => {
       errorCount += 1;
-      if (errorCount >= 2) {
+      if (openedOnce || errorCount >= 2) {
         closeSource();
         const error = new ApiError({
           code: 'SSE_UNAVAILABLE',
@@ -788,7 +794,8 @@ export function subscribeEvents(
       } else {
         logSse('error → browser reconnect');
       }
-      // On the first error EventSource reconnects on its own with the same `after`.
+      // Before a first successful open, allow one native reconnect. A dropped live stream falls
+      // back immediately so a completed run cannot remain visually stuck.
     };
   };
 

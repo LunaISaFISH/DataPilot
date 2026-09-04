@@ -21,7 +21,7 @@ jobs:
       - name: Run one semantic call and one contract-draft call against the live API
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_MODEL: claude-opus-5
+          ANTHROPIC_MODEL: claude-haiku-4-5-20251001
           DATAPILOT_AI_MODE: auto
           DATAPILOT_AI_CACHE: 'off'
         run: python scripts/llm_smoke.py

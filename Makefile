@@ -26,7 +26,7 @@ demo:
 	@echo "DataPilot demo"
 	@echo "  API  $(API_URL)   (docs disabled, no reload)"
 	@echo "  Web  http://127.0.0.1:$(WEB_PORT)"
-	@echo "  AI   mode=$${DATAPILOT_AI_MODE:-auto} model=$${ANTHROPIC_MODEL:-claude-opus-5} cache=$${DATAPILOT_AI_CACHE:-fallback}"
+	@echo "  AI   mode=$${DATAPILOT_AI_MODE:-auto} model=$${ANTHROPIC_MODEL:-claude-haiku-4-5-20251001} cache=$${DATAPILOT_AI_CACHE:-fallback}"
 	@trap 'kill 0' INT TERM EXIT; \
 	DATAPILOT_DOCS=0 .venv/bin/uvicorn datapilot.api.main:app --host $(API_HOST) --port $(API_PORT) & \
 	sleep 1; \

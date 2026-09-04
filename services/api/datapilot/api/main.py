@@ -219,7 +219,7 @@ class Settings:
     public_mode: bool = False
     run_retention_hours: int = 24
     seed_samples: bool = False
-    ai_daily_call_cap: int = 400
+    ai_daily_call_cap: int = 40
     uploads_per_minute: int = 10
     ai_requests_per_hour: int = 20
 
@@ -254,7 +254,7 @@ class Settings:
             public_mode=public_mode,
             run_retention_hours=_env_nonnegative_int("DATAPILOT_RUN_RETENTION_HOURS", 24),
             seed_samples=_env_flag("DATAPILOT_SEED_SAMPLES", public_mode),
-            ai_daily_call_cap=_env_nonnegative_int("DATAPILOT_AI_DAILY_CALL_CAP", 400),
+            ai_daily_call_cap=_env_nonnegative_int("DATAPILOT_AI_DAILY_CALL_CAP", 40),
             uploads_per_minute=_env_nonnegative_int("DATAPILOT_UPLOADS_PER_MINUTE", 10),
             ai_requests_per_hour=_env_nonnegative_int(
                 "DATAPILOT_AI_REQUESTS_PER_HOUR", 20
@@ -461,6 +461,7 @@ def _error_detail(meta: dict[str, Any]) -> ErrorDetail | None:
 
 
 def _run_detail(ctx: AppContext, run_id: str) -> RunDetail:
+    ctx.pipeline.recover_analysis_state(run_id)
     meta = _meta(ctx, run_id)
     store = ctx.store
     lifecycle = _lifecycle(meta)

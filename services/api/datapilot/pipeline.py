@@ -8,6 +8,8 @@ and flips the lifecycle to ``FAILED``).
 
 Execution model: a module-level ``ThreadPoolExecutor(max_workers=2)``; with
 ``DATAPILOT_SYNC_PIPELINE=1`` (or ``sync=True``) jobs run inline on the caller's thread.
+No-contract analyses use a separate executor so public sample warmups and model latency can
+never starve the observational path.
 
 Ordering invariant relied upon by the SSE tail: a job appends its terminal event *before* it
 updates ``meta.json`` and clears its in-flight marker, so once ``Pipeline.is_active`` reports
@@ -42,9 +44,10 @@ from datapilot.contracts.policy import (
     ContractError,
     DataContract,
     baseline_contract,
+    contract_hash,
     parse_contract,
 )
-from datapilot.engine import AnalysisError, analyze_csv, parse_csv
+from datapilot.engine import AnalysisError, analyze_csv, dataset_hash, parse_csv
 from datapilot.samples import sample_is_synthetic
 from datapilot.storage import RunStore
 
@@ -53,6 +56,9 @@ log = logging.getLogger("datapilot.pipeline")
 JobKind = Literal["analysis", "contract_draft", "brief"]
 
 EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="datapilot-pipeline")
+OBSERVATIONAL_EXECUTOR = ThreadPoolExecutor(
+    max_workers=2, thread_name_prefix="datapilot-observational"
+)
 
 STAGE_INGESTING = "INGESTING"
 STAGE_PROFILING = "PROFILING"
@@ -137,11 +143,13 @@ class Pipeline:
         *,
         sync: bool | None = None,
         executor: ThreadPoolExecutor | None = None,
+        observational_executor: ThreadPoolExecutor | None = None,
     ) -> None:
         self.store = store
         self.ai = ai
         self.sync = sync_pipeline_from_env() if sync is None else sync
         self.executor = executor or EXECUTOR
+        self.observational_executor = observational_executor or OBSERVATIONAL_EXECUTOR
         self._active: set[tuple[str, JobKind]] = set()
         self._lock = threading.Lock()
 
@@ -163,7 +171,9 @@ class Pipeline:
             lifecycle = self.store.read_meta(run_id).get("lifecycle")
         except (OSError, ValueError):
             return False
-        return lifecycle in (Lifecycle.QUEUED.value, Lifecycle.RUNNING.value)
+        if lifecycle not in (Lifecycle.QUEUED.value, Lifecycle.RUNNING.value):
+            return False
+        return not self.recover_analysis_state(run_id)
 
     def submit(self, run_id: str, kind: JobKind) -> bool:
         """Schedule a job; returns ``False`` when the same job is already in flight."""
@@ -176,7 +186,10 @@ class Pipeline:
         if self.sync:
             self._run_job(run_id, kind, job)
         else:
-            self.executor.submit(self._run_job, run_id, kind, job)
+            executor = self.executor
+            if kind == "analysis" and self.store.read_contract_yaml(run_id) is None:
+                executor = self.observational_executor
+            executor.submit(self._run_job, run_id, kind, job)
         return True
 
     def submit_analysis(self, run_id: str) -> bool:
@@ -263,6 +276,45 @@ class Pipeline:
         if text is None:
             return baseline_contract()
         return parse_contract(text)
+
+    def recover_analysis_state(self, run_id: str) -> bool:
+        """Recover terminal meta from a complete, source-bound report after process restart.
+
+        No events are synthesized: the persisted report is the evidence. A live/queued job is
+        never reconciled, and source, contract and revision must still match before meta moves.
+        """
+        if self.active_jobs(run_id):
+            return False
+        try:
+            meta = self.store.read_meta(run_id)
+            if meta.get("lifecycle") not in (Lifecycle.QUEUED.value, Lifecycle.RUNNING.value):
+                return False
+            report = self.store.read_model(run_id, REPORT_FILE, RunReport)
+            if report is None:
+                return False
+            revision = meta.get("run_revision")
+            if not isinstance(revision, int) or report.run_revision != revision:
+                return False
+            source = self.store.read_source(run_id)
+            contract = self._load_contract(run_id)
+            if report.profile.dataset_hash != dataset_hash(source):
+                return False
+            if report.contract.hash != contract_hash(contract):
+                return False
+        except (OSError, ValueError):
+            return False
+        observational = report.release_status is ReleaseStatus.NOT_EVALUATED
+        lifecycle = Lifecycle.OBSERVATIONAL if observational else Lifecycle.REVIEW_REQUIRED
+        self.store.update_meta(
+            run_id,
+            lifecycle=lifecycle.value,
+            record_count=report.profile.record_count,
+            column_count=report.profile.column_count,
+            release_status=report.release_status.value,
+            contract_source=report.contract.source.value,
+            error=None,
+        )
+        return True
 
     def _contract_source(self, run_id: str, contract: DataContract) -> ContractSource:
         stored = self.store.read_meta(run_id).get("contract_source")
@@ -366,10 +418,11 @@ class Pipeline:
                 "计算字段画像与质量分",
                 "Computing column profiles and quality metrics",
             )
+            resolver = None if contract.is_observational else self.ai.semantic_resolver(run_id)
             report = analyze_csv(
                 source,
                 contract,
-                ai=self.ai.semantic_resolver(run_id),
+                ai=resolver,
                 run_revision=run_revision,
                 run_id=run_id,
                 synthetic=sample_is_synthetic(meta.get("sample_id")),
@@ -455,7 +508,11 @@ class Pipeline:
                 "评估语义映射提议",
                 "Evaluating semantic mapping proposals",
             )
-            if "fallback_reason" in semantic_detail:
+            if contract.is_observational:
+                semantic_detail["skipped_reason"] = "observational_no_contract"
+                message_zh = "仅观测模式：跳过 AI 语义评估"
+                message_en = "Observational mode: AI semantic assessment skipped"
+            elif "fallback_reason" in semantic_detail:
                 reason = semantic_detail["fallback_reason"]
                 message_zh = f"AI 不可用 → 已降级为确定性回退（{reason}）"
                 message_en = f"AI unavailable → deterministic fallback ({reason})"

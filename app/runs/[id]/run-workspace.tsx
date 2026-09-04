@@ -23,6 +23,7 @@ import {
 } from '@/lib/api';
 import { useLanguage } from '@/lib/language';
 import type { AICallRecord, ApplyRequest, ArtifactInfo, RunDetail, RunEvent } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 import { AiSupervisionRail } from './sections/ai-supervision-rail';
 import { ApiLogDrawer } from './sections/api-log-drawer';
@@ -174,7 +175,7 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
       { after: lastSeqRef.current },
     );
     return unsubscribe;
-  }, [runId, streamGeneration, scheduleRefresh]);
+  }, [health.apiBase, runId, streamGeneration, scheduleRefresh]);
 
   const runMutation = useMemo(() => createMutationRunner({ setBusy, setLastError, setStreamGeneration, refresh }), [refresh]);
 
@@ -298,7 +299,7 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
 
   return (
     <WorkspaceContext.Provider value={value}>
-      <div className="data-dense flex h-[calc(100dvh-(2*var(--shell-strip-height)))] min-h-0 flex-col bg-background md:h-[calc(100dvh-var(--shell-strip-height))]">
+      <div className="data-dense flex h-[calc(100dvh-var(--shell-header-height)-var(--shell-status-height))] min-h-0 flex-col bg-background">
         <HeaderStrip />
         {loadError && !run ? (
           <div className="p-3">
@@ -320,15 +321,15 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
             </InlineAlert>
           </div>
         ) : null}
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_400px]">
-          <aside className="flex min-h-0 flex-col overflow-y-auto border-b border-border bg-card lg:border-r lg:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_360px]">
+          <aside className="hidden min-h-0 flex-col overflow-y-auto border-r border-border bg-card xl:flex">
             <LifecycleRail />
             <EventLogPanel mode="rail" />
           </aside>
           <section className="min-h-0 min-w-0 overflow-y-auto">
             <WorkspaceTabs />
           </section>
-          <aside className="min-h-0 overflow-y-auto border-t border-border bg-card xl:border-t-0 xl:border-l">
+          <aside className={cn('min-h-0 overflow-y-auto border-t border-border bg-card xl:block xl:border-t-0 xl:border-l', selectedFindingId ? 'block' : 'hidden')}>
             {selectedFindingId ? <FindingInspector findingId={selectedFindingId} /> : <AiSupervisionRail />}
           </aside>
         </div>

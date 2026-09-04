@@ -1,112 +1,105 @@
 # DataPilot 招聘会 3 分钟演示
 
-主入口：`https://datapilotgo.com`（Sites 前端重新发布后）
+扫码入口：`https://datapilotgo.com`
 
-公网 API：`https://datapilotgo-api.fly.dev`
+主路径：主页 →「看 3 分钟演示」→ `/demo`
 
-主数据：`uci_online_retail`，UCI Online Retail 2010 年 12 月原始子集，42,481 行 × 8 列，CC BY 4.0。
+备用真实分析：`/workbench`；公网 API：`https://datapilotgo-api.fly.dev`
 
-台上不要背最终人数；始终读屏。AI 可用且人批准提议时，会归一 `EIRE → Ireland` 的 403 个单元格；若模型不可用，确定性流程会保守回退，因此发布人数可能不同。这种差异必须如实展示。
+主数据是 UCI Online Retail 2010 年 12 月真实公开数据，42,481 行 × 8 列，CC BY 4.0。演示页是一次已完成、已独立复验的真实引擎运行快照，不是现场重跑，也不发起后端或模型请求。页面始终显示「已验证回放 · 非实时运行」。
 
-## 0:00–0:15｜先讲 AI 的权限边界
+## 0:00–0:20｜一句话建立产品定位
 
-操作：打开工作台，确认底栏显示 `API connected · Engine 0.2.0 · AI claude-opus-5 ready`，展开右侧 AI 权限卡。
-
-台词：
-
-> 先说规矩：DataPilot 里的 AI 看不到任何原始行和敏感字段，不写代码、不改数据、不定风险。它只能在 JSON Schema 内提议，策略、人和确定性校验器才拥有后续权限。右侧这张卡就是后端实际执行的权限契约。
-
-指给评委看：模型可见字段、`rows_sent = 0`、允许的动作枚举、grounding reason codes。
-
-## 0:15–0:35｜真实公开数据与确定性事实
-
-操作：在 Samples 选择带 `real-data · cc-by-4.0` 标签的 UCI Online Retail，点击“带契约分析”。
+操作：扫码打开主页，点击主按钮进入演示。
 
 台词：
 
-> 这不是为演示种植的异常，而是 UCI 的真实公开交易数据。42,481 行先由 Polars 做指纹、画像和规则检测。基线质量分 89.43，但发布仍然是 BLOCKED——质量分和能不能发布是两回事，阻断项永远优先。
+> DataPilot 不是让 AI 随意清洗 CSV，而是判断一份数据能不能安全、可解释、可审计地发布。今天用一份真实公开交易数据演示：AI 只能提议，策略和人授权，确定性规则执行，验证器决定能不能发布。
 
-指给评委看：UCI 来源、source SHA-256、实际 pipeline events、7 个 findings、固定 score scope。不要把处理中的状态称为动画。
+页面证据：真实公开数据标签、UCI 来源、CC BY 4.0、source SHA-256；演示无需登录、无需等待后台。
 
-## 0:35–1:10｜AI 真正贡献，但不拥有决定权
+## 0:20–0:55｜第一步：发现问题
 
-操作：打开 `SEM-Country` 的 AI 监管区，先看发送信封，再看建议和接地结果。
-
-AI 成功或命中预热缓存时：
-
-> 模型只收到 Country 一列的聚合词频、候选词、允许的国家词表和证据编号，没有一行原始数据。它识别 `EIRE` 与 `Ireland` 的语义关系；但它报告的数量不可信，后端重新计算为 403 条。源值、目标词表、证据引用、输入哈希和敏感字段边界全部通过后，提议才有资格进入人工审批。
-
-AI 超时、拒绝或预算耗尽时：
-
-> 现在模型没有给出可采用结果，所以系统明确标记 deterministic fallback，提议不会自动变成动作，发布继续阻断。AI 在这里只影响效率，不影响安全。
-
-指给评委看：provider/model、`served_from_cache`、真实 token/latency 或 fallback reason、`input_hash`、`affected_record_count = 403`、AI ledger call ID。
-
-## 1:10–1:35｜现场攻击 AI 输出
-
-操作：选择红队用例 `UNKNOWN_CANONICAL_TARGET`，展示原始提议和篡改提议的 diff。
+操作：停留在「发现问题」。
 
 台词：
 
-> 如果模型幻觉或被提示词注入怎么办？我把目标替换成词表外值。生产用的同一个 grounding validator 立即返回 `UNKNOWN_CANONICAL_TARGET`，不创建 action，批准按钮也不会亮。系统是按 AI 一定会出错来设计的。
+> Polars 在固定的 42,481 条源记录范围内得到 89.43 分和 7 项发现，其中 5 项会阻断发布。分数高不代表可以发布；阻断项优先。这里的数字、分子分母和 scope hash 都来自同一份运行工件，没有为演示硬编码另一套结果。
 
-可替换演示：`AMBIGUITY_REGISTRY_HIT` 或 `TIMEOUT`；二者都必须显示未绕过发布门禁。
+指给评委看：500 个重复成员、42,481 个日期格式单元格、403 个国家名语义变体、15,631 个缺失 CustomerID，以及 `BLOCKED`。
 
-## 1:35–2:05｜策略和人工处置
+## 0:55–1:35｜第二步：AI 赋能与 AI 监管
 
-操作：先尝试直接生成变更集，让未处置 findings 的门禁显现；随后按 UI 允许的选项完成审批、隔离和排除。
-
-台词：
-
-> 低风险且满足条件的动作可以由具名 policy rule 授权；中风险语义归一要人批准；高风险缺失、歧义或敏感问题只能隔离、排除或复核。每个 finding 必须恰好有一个处置，并记录 run revision、理由和授权来源。
-
-## 2:05–2:40｜预演、执行和 14 道验证
-
-操作：生成 Change Set，指出 `approved_action_set_hash` 与每个 action 的 `authorization_source/ref`；点击 Apply；进入 Validation & Release；再点击内存篡改测试。
+操作：点击「下一步」，展示 `EIRE → Ireland`。
 
 台词：
 
-> 先 dry run 锁定动作集、精确影响范围和遮蔽后的前后样例，再由 allowlist executor 执行。当前 AI 路径下读屏可见 25,653 条 eligible、16,341 条 quarantine、487 条 release exclusion，候选质量分 95.92；原始 scope 从未缩水。14 项 post-condition 全通过才发布。现在我在内存里翻转源文件一个字节，`SOURCE_IMMUTABLE` 立刻变红、状态回到 BLOCKED，而且不写出任何工件。
+> 模型只收到 Country 列的聚合候选、词频、契约词表和证据编号，原始行发送数是 0。它提出 `EIRE → Ireland`，但模型无权决定风险，也无权修改数据。后端重新计算影响范围为 403 条，并逐项验证来源值、目标词表和证据引用；通过后仍然要求人工批准。
 
-若 AI 回退，直接读屏上的真实人数；不要引用上一段数字，也不要把 exclusion 说成删除 source rows。
+指给评委看：`rows sent = 0`、`aggregate values sent = 38`、grounding passed、human approval required、AI ledger input hash。
 
-## 2:40–3:00｜哈希与可审计交付
+说明：这个快照忠实保留当次运行实际使用的模型记录；新的实时运行默认使用低成本 `claude-haiku-4-5-20251001`。回放不调用模型，不产生费用。
 
-操作：展示 source → candidate → release 哈希链、AI ledger、changes ledger，下载 `release.csv`、manifest 和 audit bundle。
+## 1:35–2:10｜第三步：做出决定
+
+操作：点击「下一步」，进入审核决定。
 
 台词：
 
-> 最后不信一张漂亮报表，信可复算的哈希和账本：谁提议、谁授权、改了哪些 cell、哪些记录只在发布包中被隔离，都能追到。总结就是：AI 提议，策略决策，人来拍板，规则执行，验证门禁发布。
+> 两项低风险动作由具名策略规则授权，五项语义或阻断动作由人授权。每个 finding 必须恰好获得一个最终处置，所以台账是 7/7。AI 的 proposal 和 executor 的 action 是不同对象；没有授权来源的提议永远进不了执行器。
 
-## 追问加演（每项 20–30 秒）
+指给评委看：授权来源、动作白名单、7/7 finding ledger。强调 500 是重复成员数；由于隔离优先且集合有重叠，最终发布排除是 487 条，不把 source rows 描述成被删除。
 
-- 幂等：用同一 Idempotency-Key 再次 Apply，展示 `X-Idempotent-Replay: true` 和相同 manifest。
-- 离线复验：运行 `.venv/bin/python -m datapilot verify <run_dir>`，复算所有工件和哈希。
-- 换数据：切到电商或 HR 样例，展示相同引擎生成不同 detectors、风险和动作。
-- AI 失败：红队选择 `TIMEOUT`，展示 fallback attribution 与发布仍受控。
-- 观测模式：上传不带契约的 CSV，解释系统只报告事实、不擅自发明业务规则。
-- 契约起草：展示 AI 草案与 rejected fields；草案必须经 schema/grounding 校验并由人采用，不能直接改变当前 run。
+## 2:10–2:50｜第四步：安全交付
 
-## 规模问题答法
+操作：点击「下一步」，进入交付结果。
 
-> 当前 P0 明确限制 25 MiB、250,000 physical rows、200 columns；现场 42,481 行由单机 Polars 处理。它不是分布式大数据系统。下一阶段是将仍以 Python 循环实现的 detector 下推为 Polars expressions，并把 job runner 拆成独立 worker；接口和数据契约无需改变。
+台词：
+
+> 执行器只运行白名单规则，并写出新的派生版本；源文件保持不变。14 项 post-condition 全部通过后，发布状态才从 BLOCKED 变成 CONDITIONAL_PASS。最终 25,653 条可发布、16,341 条隔离、487 条仅从发布包排除；固定 scope 下质量分从 89.43 到 95.92，completeness 和 uniqueness 没有靠缩小分母制造改善。
+
+指给评委看：14/14、before/after 四维分数、source/scope/contract/action/release hashes。
+
+## 2:50–3:00｜收束
+
+台词：
+
+> DataPilot 不追求自动改得最多，而是只自动执行证据与策略允许的部分。最终交付的不只是一份 CSV，而是一条可以复验的发布证据链。
+
+## 评委追问时再打开真实模式
+
+演示页右上角或最后一步进入「真实分析」：
+
+- 上传任意受支持 CSV，或展开样例并启动真实后端运行；
+- 「快速扫描」不调用 LLM，只做 ingestion、profiling 与确定性检测；
+- 带契约分析会启用受约束语义提议、人工处置、dry run、apply 与验证；
+- 运行页 SSE 断开时自动切换轮询，不把等待动画冒充进度；
+- 实时模型默认 Haiku，并受每日 40 次全局上限和每客户端限流保护；预算耗尽时如实回退，绝不伪装成模型成功。
+
+如果展示实时 AI，必须读屏说明 provider、model、token、latency、input hash、redaction 与 grounding。不要背诵回放数字作为新运行结果。
 
 ## 现场兜底阶梯
 
-1. 首选公网 live 服务，样例语义请求使用已验证的 `input_hash` 缓存并明确标注 cached。
-2. 公网 AI 不通：确定性引擎继续，AI 显示 fallback，发布仍 fail closed。
-3. 公网 API 不通：打开 `/demo/clinical-nlp`，顶部必须保留 `Verified Demo Replay`，不能称为 live。
-4. 设备故障：播放预先录制的一次完整 live run；明确说明它是录屏。
+1. 首选 `/demo`：静态加载、零后端请求、零模型费用，仍使用真实引擎和独立复验产出的数据。
+2. 需要证明真实功能时再打开 `/workbench`，先用「快速扫描」或小样例。
+3. 公网 API 或 Anthropic 不可用时，回放照常工作；实时页必须明确显示断连或 deterministic fallback。
+4. 手机或网络完全不可用时才使用预录屏，并明确说明是录屏。
 
 ## 彩排清单
 
-- 执行 `make test`、`make demo-reset`、`make demo-prewarm`。
-- 执行 `.venv/bin/python scripts/demo_smoke.py --base https://datapilotgo-api.fly.dev --sample uci_online_retail --timeout 180`。
-- 手机 5G 和会场 Wi-Fi 各扫码一次；检查中英文切换、UCI 来源和 API connected。
-- 外接屏 125% 缩放、3 米距离确认 BLOCKED、reason code 和哈希可读；关闭 DevTools 和通知。
-- 检查 Fly `/health`、AI daily budget、磁盘可写；不要在屏幕上打开 secrets。
-- 下载文件前提醒：CSV 为审计一致的原始字节；用电子表格打开不受信任 CSV 时需采用隔离或安全导入流程。
+```bash
+make test
+make demo
+node scripts/e2e_smoke.mjs --web http://localhost:3000
+```
 
-## 冻结的合成回放基线
+- 手机 5G 和会场 Wi-Fi 各扫码一次；确认 `/demo` 秒开、中英文切换、390px 无横向溢出。
+- 检查 `https://datapilotgo-api.fly.dev/health`，但不要在屏幕上打开或输出 secrets。
+- 若要验证完整 API 生命周期，在 replay 模式的本地 API 上运行 `make demo-smoke`，避免彩排重复消费模型额度。
+- 只有明确要验证供应商集成或输出质量时才使用 `--live`；普通测试和现场主路径不需要模型调用。
 
-`clinical-nlp@1.2.0`：5,200 records × 18 fields，baseline 99.27，candidate 99.61，9 个 findings，316 cells transformed，56 quarantined，43 exact duplicates excluded from release，5,101 eligible，14/14 validations，最终 `CONDITIONAL_PASS`。这些数字来自 `fixtures/clinical_nlp/golden/report.json`；有意修改 fixture 或算法后运行 `make golden` 并同步文档。
+## 冻结回放数据来源
+
+`lib/data/uci-online-retail-replay.json` 由 `scripts/export_verified_replay.py` 从一个已完成的 `APPLIED` UCI 运行导出。导出器在写入前验证 source/contract/scope/action/decision/release 哈希链、finding 守恒、行数守恒、14 项执行验证、独立 `/verify` 结果与 AI ledger 引用；快照不包含源行、record UID、模型请求/响应 payload 或 distinct examples。
+
+更新回放只能执行导出脚本并通过 `tests/test_verified_replay.py`，不得手工修改展示数字。

@@ -1,4 +1,7 @@
+# Historical design-panel input
 
+> This is the unedited review input that informed v0.2. Its route layout, model choice and live-first
+> booth sequence are superseded by `docs/BUILD-SPEC.md` and `docs/DEMO.md`; keep it only as a decision record.
 
 # JUDGE 1
 

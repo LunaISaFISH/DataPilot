@@ -256,6 +256,22 @@ def test_anthropic_request_carries_the_payload_only_as_a_json_user_message() -> 
     assert CANARY not in kwargs["system"][0]["text"]
 
 
+def test_haiku_request_omits_unsupported_effort_parameter() -> None:
+    provider = AnthropicProvider("claude-haiku-4-5-20251001", client=object())
+    kwargs = provider.request_kwargs(
+        SYSTEM_PROMPTS[AITask.SEMANTIC],
+        "{}",
+        {"type": "object"},
+        effort="low",
+        max_tokens=2000,
+        timeout_s=25.0,
+    )
+
+    assert kwargs["output_config"]["format"]["type"] == "json_schema"
+    assert "effort" not in kwargs["output_config"]
+    assert "fallbacks" not in kwargs and "betas" not in kwargs
+
+
 def test_semantic_payload_caps_values_and_drops_unsafe_tokens() -> None:
     many = {f"value-{index:02d}": 100 - index for index in range(40)}
     many["bad\x00control"] = 500

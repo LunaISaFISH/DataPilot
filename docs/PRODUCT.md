@@ -55,13 +55,20 @@ Every attempt is written to the AI ledger with provider/model attribution, promp
 
 The UI labels synthetic and real public data explicitly. Engine-generated numbers, provider attribution, pipeline events, cached results, and replay state must never be replaced by decorative constants or simulated progress.
 
+## Presentation and live modes
+
+- `/demo` reads a privacy-minimised snapshot exported from one real, completed and independently verified UCI run. It is instant, bilingual, usable without the API, always labelled replay, and never simulates a live pipeline or model call.
+- `/workbench` preserves live CSV upload, bundled samples, observational analysis and contracted analysis. Operational API/model status appears only in these live routes.
+- Observational runs never construct or schedule an LLM resolver. They use a dedicated executor so provider latency or startup prewarming cannot starve deterministic profiling.
+- A historical replay preserves the provider/model recorded at the time of that run; new live calls default to `claude-haiku-4-5-20251001` and remain fully attributed in the ledger.
+
 ## Public P0 boundary
 
 The public Fly runtime is a capped recruitment-demo service:
 
 - 25 MiB, 250,000 physical rows, and 200 columns maximum per CSV;
 - 10 uploads/minute and 20 AI-triggering requests/hour per client;
-- persistent global daily provider-call ceiling with deterministic fallback;
+- persistent global daily provider-call ceiling (40 calls in the fair deployment) with deterministic fallback;
 - visitor run/artifact expiry after 24 hours; protected public samples persist;
 - exact CORS allow-list, disabled public API docs, non-secret health status, masked logs, and server-only credentials;
 - four stable sample runs created and prewarmed at startup.

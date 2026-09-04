@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATAPILOT_AI_MODE=auto \
     DATAPILOT_AI_CACHE=fallback \
     DATAPILOT_DOCS=0 \
-    ANTHROPIC_MODEL=claude-opus-5
+    ANTHROPIC_MODEL=claude-haiku-4-5-20251001
 
 WORKDIR /app
 COPY pyproject.toml README.md ./

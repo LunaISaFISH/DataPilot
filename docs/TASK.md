@@ -2,38 +2,44 @@
 
 Updated: 2026-09-04 (Asia/Singapore)
 
-## Delivered
+## Current state
 
-- Branch `main`; v0.2 application release commit `f32999e1c34d` is pushed to `origin/main` with Luna as author and committer.
-- Real v0.2 frontend/backend integration completed for clinical, e-commerce, HR, and UCI samples; observational upload and AI-assisted contract drafting also exercised.
-- Demo operations exist: `make demo-reset`, `make demo-prewarm`, `scripts/demo_smoke.py`, and `scripts/e2e_smoke.mjs`.
-- Three backend adversarial reviews completed. Fixes cover immutable source/meta protection, recoverable apply state, masked business keys, score consistency, honest fallback attribution, concurrent daily-call reservation, safe YAML errors, and formula-risk disclosure.
-- Public mode implements per-client upload/AI limits, persistent global AI budget, 24-hour visitor cleanup, protected sample seeds, and startup prewarm. The frontend supports safe runtime backend switching.
-- Fly app `datapilotgo-api` is live in `nrt` on machine `683615ebee7668`, image `deployment-01M1PC7GY1DSEBRC54MDER9E93`; health check is passing and the 3 GB `datapilot_data` volume is attached.
-- Public UCI smoke passed end to end: 42,481 records, 7 findings, source score 89.43, grounded Anthropic `EIRE → Ireland` mapping across an engine-recounted 403 records, candidate score 95.92, 25,653 eligible, 16,341 quarantined, 487 excluded from the release package, 14/14 validations, final `CONDITIONAL_PASS`, and offline verify success.
-- Public web-to-Fly CORS connection was browser-tested through the runtime `?api=` override.
+- Branch `main`, based on pushed commit `cbb5c39`; the current v0.2 finish-up is uncommitted and awaits owner approval before commit/push/deploy.
+- Existing web identity and domain are reused: `https://datapilotgo.com`. No duplicate Site was created.
+- Existing API app is reused: `https://datapilotgo-api.fly.dev`; the Fly secret name `ANTHROPIC_API_KEY` is present and its value was not printed.
+- The public API still serves the previous image until the owner approves deployment of this worktree.
 
-## Verification
+## Implemented in this worktree
 
-- Final full local gate: 271 pytest tests, Ruff, mypy `--strict` across 38 source files, oxlint, and production frontend build all passed.
-- Deployment-specific coverage includes installed-container fixture resolution and public runtime limiting.
-- `docs/SAMPLES.md` and the frozen clinical replay agree with `fixtures/clinical_nlp/golden/report.json`: 99.27 → 99.61, 9 findings, 316 transformed cells, 56 quarantined, 43 duplicate release exclusions, 5,101 eligible, 14/14 validations.
+- Replaced the dense sidebar/PPT-like entry screen with a quiet top navigation, compact landing page, and a focused live workbench.
+- Added `/demo`, a four-step bilingual booth experience sourced from a privacy-minimised snapshot of a real APPLIED UCI run. It loads without `/health`, `/v1`, or an LLM call and is always labelled as replay.
+- Added `scripts/export_verified_replay.py`. It verifies the source, contract, score scope/version, dispositions, row reconciliation, validations, independent `/verify` checks, and AI-ledger references before atomically writing the snapshot.
+- Added replay privacy/conservation tests. No source rows, record UIDs, request/response payloads, or distinct examples are published.
+- Fixed browser run refresh by subscribing to FastAPI's named `run_event` SSE events and falling back to polling immediately after a previously open stream drops.
+- Isolated observational jobs from contracted/AI jobs. No-contract analysis receives no AI resolver and records an empty AI ledger; completed persisted reports can recover a terminal lifecycle safely after restart.
+- Reduced the new live default from Opus to `claude-haiku-4-5-20251001`; preserved the historical model identity in the frozen replay ledger. Fly's persistent daily cap is 40 calls.
+- Simplified mobile run pages so lifecycle/log/AI rails do not stack ahead of the core workspace. The 390px replay path has no horizontal overflow.
+- Updated the real-browser smoke to prove: zero API calls in booth replay, UCI observational completion, contracted run through apply, 14/14 validations, bilingual mobile rendering, and no horizontal overflow.
 
-## Deployment state
+## Verified
 
-- API: `https://datapilotgo-api.fly.dev`; `/health` reports engine/API 0.2.0, Anthropic ready, public mode enabled, four protected seeds, writable storage, and non-secret budget counters.
-- Model secret name is present in Fly; its value was never printed by this work.
-- Frontend: existing `https://datapilotgo.com` still serves the prior Sites build until the owner rebuilds the existing Site with `NEXT_PUBLIC_API_BASE_URL=https://datapilotgo-api.fly.dev`.
-- Current Fly image was rebuilt after commit `f32999e1c34d` was pushed, so the public application code is bound to an immutable repository revision.
+- `make test`: 283 pytest tests passed; Ruff, mypy across 38 source files, oxlint, and production vinext build passed.
+- Local Playwright flow passed against a replay-mode API and the current frontend, including repeated UCI quick scans under 0.4 seconds and the full contracted release.
+- In-app mobile-browser QA passed in English and Chinese: all four replay stages, zero replay API requests, collapsed live samples, public observational completion, and no horizontal overflow at 390 × 844.
+- A minimal live smoke passed with `claude-haiku-4-5-20251001`: the semantic call returned a grounded mapping in 7.9 s (1,279 input / 191 output tokens); contract drafting returned in 14.2 s (2,542 / 1,069), and the validator rejected one unsupported format rule. Haiku-specific request construction omits unsupported `effort` and server-side `fallbacks` parameters.
+- `flyctl config validate` passed. `Dockerfile.api` built successfully and the resulting container returned `/health` with engine `0.2.0`, AI mode `off`, and four samples.
+- Snapshot facts: 42,481 × 8 real UCI records; 7 findings; 89.43 → 95.92 fixed-scope score; 25,653 eligible; 16,341 quarantined; 487 release-excluded; 14/14 validations; `CONDITIONAL_PASS`.
+- Snapshot source SHA-256 matches `fixtures/uci_online_retail/online_retail_2010_12.csv`; independent run verification contains 10/10 passing checks.
 
-## Remaining owner actions
+## Remaining before public release
 
-1. Rebuild the existing OpenAI Site with the public API environment parameter; do not create a second Site.
-2. On the event morning run the checklist in `docs/DEMO.md`, including phone-network smoke and prewarming.
+1. Ask the owner for explicit permission to commit as Luna, push `main`, deploy Fly, and publish the existing Site.
+2. After approval: deploy Fly, verify public `/health`, run a no-cost observational/public smoke first, then rebuild/publish the existing Site with `NEXT_PUBLIC_API_BASE_URL=https://datapilotgo-api.fly.dev`.
+3. Verify `https://datapilotgo.com/demo` at 390px over a real mobile network and confirm the public live workbench reports the Haiku default.
 
 ## Known limits
 
-- Public demo is a single Fly machine and local filesystem store, not a multi-region or multi-tenant production service.
-- Current P0 input boundary is CSV ≤ 25 MiB, ≤ 250,000 physical rows, and ≤ 200 columns.
-- Browser runtime API override is intentionally restricted to credential-free HTTP(S) origins.
-- The deterministic fallback preserves safety and availability but may produce different UCI release membership because the 403-cell semantic mapping is withheld.
+- The public backend is one Fly machine with a persistent local filesystem, not multi-region or multi-tenant production infrastructure.
+- P0 accepts CSV up to 25 MiB, 250,000 physical rows, and 200 columns.
+- The booth snapshot proves a pinned completed run; it is not evidence that a new provider call is happening now. Live provider and fallback states remain visible in the workbench ledger.
+- Historical replay provenance names the model actually used for that run; it must not be rewritten to match the new cheaper default.
