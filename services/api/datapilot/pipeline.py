@@ -45,6 +45,7 @@ from datapilot.contracts.policy import (
     parse_contract,
 )
 from datapilot.engine import AnalysisError, analyze_csv, parse_csv
+from datapilot.samples import sample_is_synthetic
 from datapilot.storage import RunStore
 
 log = logging.getLogger("datapilot.pipeline")
@@ -371,7 +372,7 @@ class Pipeline:
                 ai=self.ai.semantic_resolver(run_id),
                 run_revision=run_revision,
                 run_id=run_id,
-                synthetic=isinstance(meta.get("sample_id"), str),
+                synthetic=sample_is_synthetic(meta.get("sample_id")),
             )
             source_kind = self._contract_source(run_id, contract)
             if report.contract.source != source_kind:

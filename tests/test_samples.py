@@ -125,6 +125,19 @@ def test_sample_dataclass_is_frozen() -> None:
         sample.id = "other"  # type: ignore[misc]
 
 
+@pytest.mark.parametrize(
+    ("sample_id", "expected"),
+    [
+        ("clinical_nlp", True),
+        ("ecommerce_orders", True),
+        ("hr_roster", True),
+        ("uci_online_retail", False),
+    ],
+)
+def test_sample_provenance_is_explicit(sample_id: str, expected: bool) -> None:
+    assert get_sample(sample_id).synthetic is expected
+
+
 @pytest.mark.parametrize("sample_id", sorted(SAMPLES))
 def test_generators_are_deterministic_utf8_csv(sample_id: str) -> None:
     sample = get_sample(sample_id)

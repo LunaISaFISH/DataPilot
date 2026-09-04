@@ -682,6 +682,7 @@ def test_every_sample_full_flow_via_api(client: TestClient, sample_id: str) -> N
     assert detail["lifecycle"] == "REVIEW_REQUIRED", detail.get("error")
     assert detail["report"]["release_status"] == "BLOCKED"
     assert detail["report"]["contract"]["source"] == "sample"
+    assert detail["report"]["synthetic"] is (sample_id != "uci_online_retail")
 
     decided = _decide_all(client, run_id)
     assert decided["unresolved"] == []

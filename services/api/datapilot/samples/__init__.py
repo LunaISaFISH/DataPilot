@@ -32,6 +32,7 @@ class Sample:
     planted: dict[str, int]
     rows: int
     columns: int
+    synthetic: bool
 
     @property
     def has_contract(self) -> bool:
@@ -82,6 +83,7 @@ CLINICAL_NLP = Sample(
     },
     rows=clinical_nlp.ROW_COUNT,
     columns=len(clinical_nlp.FIELDNAMES),
+    synthetic=True,
 )
 
 ECOMMERCE_ORDERS = Sample(
@@ -117,6 +119,7 @@ ECOMMERCE_ORDERS = Sample(
     },
     rows=ecommerce_orders.ROW_COUNT,
     columns=len(ecommerce_orders.FIELDNAMES),
+    synthetic=True,
 )
 
 HR_ROSTER = Sample(
@@ -148,6 +151,7 @@ HR_ROSTER = Sample(
     },
     rows=hr_roster.ROW_COUNT,
     columns=len(hr_roster.FIELDNAMES),
+    synthetic=True,
 )
 
 UCI_ONLINE_RETAIL = Sample(
@@ -171,6 +175,7 @@ UCI_ONLINE_RETAIL = Sample(
     planted=dict(uci_online_retail.MEASURED),
     rows=uci_online_retail.ROW_COUNT,
     columns=len(uci_online_retail.FIELDNAMES),
+    synthetic=False,
 )
 
 SAMPLES: dict[str, Sample] = {
@@ -188,6 +193,14 @@ def get_sample(sample_id: str) -> Sample:
         return SAMPLES[sample_id]
     except KeyError:
         raise KeyError(f"unknown sample: {sample_id}") from None
+
+
+def sample_is_synthetic(sample_id: object) -> bool:
+    """Return provenance for a bundled sample; uploads and unknown ids are not synthetic."""
+    if not isinstance(sample_id, str):
+        return False
+    sample = SAMPLES.get(sample_id)
+    return sample.synthetic if sample is not None else False
 
 
 def sample_contract_text(sample_id: str) -> str | None:
@@ -208,5 +221,6 @@ __all__ = [
     "Sample",
     "get_sample",
     "list_samples",
+    "sample_is_synthetic",
     "sample_contract_text",
 ]

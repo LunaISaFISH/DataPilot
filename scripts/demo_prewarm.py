@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
             parse_contract(contract_text),
             ai=runtime.semantic_resolver(run_id),
             run_id=run_id,
-            synthetic=True,
+            synthetic=sample.synthetic,
         )
         elapsed = int((time.perf_counter() - started) * 1000)
         sem = [f for f in report.findings if f.finding_type == "SEMANTIC_VARIANT"]

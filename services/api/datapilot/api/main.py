@@ -100,7 +100,7 @@ from datapilot.public_runtime import (
     is_public_seed,
     seed_public_samples,
 )
-from datapilot.samples import get_sample, list_samples, sample_contract_text
+from datapilot.samples import get_sample, list_samples, sample_contract_text, sample_is_synthetic
 from datapilot.serialization import atomic_write_json
 from datapilot.storage import (
     CONTRACT_FILE,
@@ -1288,7 +1288,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ai=_RerunResolver(ai.semantic_resolver(run_id), report, finding_id),
             run_revision=revision,
             run_id=run_id,
-            synthetic=isinstance(meta.get("sample_id"), str),
+            synthetic=sample_is_synthetic(meta.get("sample_id")),
         )
         fresh = fresh.model_copy(
             update={
